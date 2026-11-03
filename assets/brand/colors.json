@@ -1,0 +1,14 @@
+{
+  "primary": "#8B5CF6",
+  "primaryLight": "#A78BFA",
+  "primaryDark": "#6D28D9",
+  "accent": "#3B82F6",
+  "background": "#0B0B1A",
+  "surface": "#151529",
+  "surface2": "#1E1B36",
+  "text": "#F8FAFC",
+  "muted": "#A6A7B5",
+  "success": "#22C55E",
+  "warning": "#F59E0B",
+  "error": "#EF4444"
+}

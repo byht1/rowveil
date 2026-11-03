@@ -1,0 +1,70 @@
+# QueryNest testbed: PostgreSQL + MySQL + SQLite with data for every QueryNest feature.
+#
+#   docker compose -f examples/testbed/docker-compose.yml up -d --build
+#   open http://localhost:4984
+#
+# Only the databases (use them from a locally running QueryNest):
+#   docker compose -f examples/testbed/docker-compose.yml up -d postgres mysql
+#   postgres://postgres:postgres@localhost:54329/testbed
+#   mysql://root:root@localhost:13306/testbed
+#   sqlite://examples/testbed/testbed.db
+#
+# Start from scratch (re-run the seed scripts):
+#   docker compose -f examples/testbed/docker-compose.yml down -v
+name: querynest-testbed
+
+services:
+  postgres:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_PASSWORD: postgres
+      POSTGRES_DB: testbed
+    ports:
+      - "54329:5432"
+    volumes:
+      - ./postgres.sql:/docker-entrypoint-initdb.d/testbed.sql:ro
+      - pg-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres -d testbed"]
+      interval: 2s
+      retries: 60
+
+  mysql:
+    image: mysql:8.4
+    environment:
+      MYSQL_ROOT_PASSWORD: root
+      MYSQL_DATABASE: testbed
+    command: ["--character-set-server=utf8mb4", "--collation-server=utf8mb4_0900_ai_ci"]
+    ports:
+      - "13306:3306"
+    volumes:
+      - ./mysql.sql:/docker-entrypoint-initdb.d/testbed.sql:ro
+      - mysql-data:/var/lib/mysql
+    healthcheck:
+      test: ["CMD-SHELL", "mysqladmin ping -h 127.0.0.1 -uroot -proot --silent"]
+      interval: 3s
+      retries: 60
+
+  querynest:
+    build: ../..
+    image: querynest:latest
+    ports:
+      - "4984:4983"
+    environment:
+      DATABASE_URL_POSTGRES: postgres://postgres:postgres@postgres:5432/testbed
+      DATABASE_URL_MYSQL: mysql://root:root@mysql:3306/testbed
+      DATABASE_URL_SQLITE: sqlite:///db/testbed.db
+      DATABASE_URL_PG_READER: postgres://app_reader:reader@postgres:5432/testbed
+    volumes:
+      - ./:/db            # the folder, so SQLite can create its journal next to the file
+      - querynest-data:/data
+    depends_on:
+      postgres:
+        condition: service_healthy
+      mysql:
+        condition: service_healthy
+
+volumes:
+  pg-data:
+  mysql-data:
+  querynest-data:

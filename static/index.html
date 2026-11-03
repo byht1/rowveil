@@ -1,0 +1,30 @@
+<!doctype html>
+<html lang="en" data-theme="querynest">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>QueryNest</title>
+  <link rel="icon" href="/favicon.svg" type="image/svg+xml">
+  <link rel="alternate icon" href="/favicon.ico" sizes="16x16 32x32 48x48">
+  <meta name="theme-color" content="#8B5CF6">
+  <link rel="stylesheet" href="/style.css">
+  <script>
+    // app.js stores the theme as JSON ("one-dark-pro" with quotes); also accept a plain value
+    try {
+      const raw = localStorage.getItem('rs.theme');
+      let t = raw;
+      try { t = JSON.parse(raw); } catch {}
+      if (typeof t === 'string' && t) document.documentElement.dataset.theme = t;
+    } catch {}
+  </script>
+</head>
+<body>
+  <div id="app">
+    <aside id="sidebar"></aside>
+    <div id="sidebar-resizer"></div>
+    <main id="main"></main>
+  </div>
+  <div id="toasts"></div>
+  <script type="module" src="/app.js"></script>
+</body>
+</html>

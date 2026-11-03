@@ -1,0 +1,57 @@
+[package]
+name = "querynest"
+version = "0.2.0"
+edition = "2021"
+description = "QueryNest: database explorer and query tool for PostgreSQL, MySQL and SQLite"
+default-run = "querynest"
+repository = "https://github.com/byht1/querynest"
+homepage = "https://byht1.github.io/querynest/"
+readme = "README.md"
+keywords = ["database", "sql", "postgresql", "mysql", "sqlite"]
+
+[lib]
+name = "querynest"
+path = "src/lib.rs"
+
+# Desktop app: its own window (WebView2 on Windows), no console, no browser.
+[[bin]]
+name = "querynest"
+path = "src/bin/desktop.rs"
+required-features = ["desktop"]
+
+# Web server: the UI in a browser; used by Docker.
+[[bin]]
+name = "querynest-server"
+path = "src/main.rs"
+
+[features]
+default = ["desktop"]
+desktop = ["dep:tao", "dep:wry", "dep:rfd"]
+
+[dependencies]
+anyhow = "1"
+axum = "0.8"
+base64 = "0.22"
+clap = { version = "4", features = ["derive", "env"] }
+dirs = "6"
+futures = "0.3"
+open = "5"
+rfd = { version = "0.17.2", optional = true }
+serde = { version = "1", features = ["derive"] }
+serde_json = { version = "1", features = ["preserve_order"] }
+sqlx = { version = "0.8", default-features = false, features = ["runtime-tokio", "tls-rustls-ring-webpki", "postgres", "mysql", "sqlite", "macros"] }
+tao = { version = "0.37.2", optional = true }
+tokio = { version = "1", features = ["full"] }
+tower-http = { version = "0.7.1", features = ["catch-panic"] }
+tracing = "0.1"
+tracing-subscriber = { version = "0.3", features = ["env-filter"] }
+uuid = { version = "1", features = ["v4"] }
+wry = { version = "0.57.1", optional = true }
+
+[profile.release]
+opt-level = 3
+lto = "thin"
+strip = true
+
+[target."cfg(windows)".build-dependencies]
+winresource = "0.1.34"

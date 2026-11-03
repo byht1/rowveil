@@ -1,0 +1,38 @@
+# QueryNest (web) + a demo PostgreSQL database.
+#   docker compose up -d --build   ->  open http://localhost:4983
+services:
+  querynest:
+    build: .
+    image: querynest:latest
+    ports:
+      - "4983:4983"
+    environment:
+      # Main connection (optional). More: DATABASE_URL_<NAME>=...
+      DATABASE_URL: postgres://postgres:postgres@demo-db:5432/shop
+      # A database on your host machine:
+      # DATABASE_URL_LOCAL: postgres://user:pass@host.docker.internal:5432/mydb
+      # Optional basic auth:
+      # STUDIO_PASSWORD: change-me
+    volumes:
+      - querynest-data:/data            # saved connections
+      # - ./my.db:/db/my.db           # SQLite file -> DATABASE_URL_FILE: sqlite:///db/my.db
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    depends_on:
+      demo-db:
+        condition: service_healthy
+
+  demo-db:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_PASSWORD: postgres
+      POSTGRES_DB: shop
+    volumes:
+      - ./examples/postgres-seed.sql:/docker-entrypoint-initdb.d/seed.sql:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 2s
+      retries: 20
+
+volumes:
+  querynest-data:

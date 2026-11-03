@@ -5,7 +5,7 @@
 //! "Modify" on exactly the files that block writes. The change is persistent, so the prompt
 //! does not come back.
 
-use anyhow::{bail, Context, Result};
+use anyhow::{bail, Result};
 use std::path::{Path, PathBuf};
 
 /// Paths that must become writable before SQLite can change `db`:
@@ -51,6 +51,7 @@ pub const CAN_GRANT: bool = cfg!(windows);
 /// Gives the current user write access to `paths`. Shows one UAC prompt on Windows.
 #[cfg(windows)]
 pub async fn grant_write(paths: &[PathBuf]) -> Result<()> {
+    use anyhow::Context;
     use tokio::process::Command;
 
     if paths.is_empty() {

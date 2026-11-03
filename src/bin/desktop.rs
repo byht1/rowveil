@@ -76,6 +76,45 @@ fn init_logging(data_dir: &Path) {
     }
 }
 
+#[cfg(target_os = "macos")]
+fn mac_menu() -> muda::Menu {
+    use muda::{AboutMetadata, Menu, PredefinedMenuItem, Submenu};
+    let menu = Menu::new();
+    let about = AboutMetadata { name: Some(APP_NAME.into()), version: Some(env!("CARGO_PKG_VERSION").into()), ..Default::default() };
+    let app = Submenu::with_items(APP_NAME, true, &[
+        &PredefinedMenuItem::about(None, Some(about)),
+        &PredefinedMenuItem::separator(),
+        &PredefinedMenuItem::services(None),
+        &PredefinedMenuItem::separator(),
+        &PredefinedMenuItem::hide(None),
+        &PredefinedMenuItem::hide_others(None),
+        &PredefinedMenuItem::show_all(None),
+        &PredefinedMenuItem::separator(),
+        &PredefinedMenuItem::quit(None),
+    ]);
+    let edit = Submenu::with_items("Edit", true, &[
+        &PredefinedMenuItem::undo(None),
+        &PredefinedMenuItem::redo(None),
+        &PredefinedMenuItem::separator(),
+        &PredefinedMenuItem::cut(None),
+        &PredefinedMenuItem::copy(None),
+        &PredefinedMenuItem::paste(None),
+        &PredefinedMenuItem::select_all(None),
+    ]);
+    let window = Submenu::with_items("Window", true, &[
+        &PredefinedMenuItem::minimize(None),
+        &PredefinedMenuItem::maximize(None),
+        &PredefinedMenuItem::separator(),
+        &PredefinedMenuItem::close_window(None),
+        &PredefinedMenuItem::fullscreen(None),
+    ]);
+    for sub in [app, edit, window].into_iter().flatten() {
+        let _ = menu.append(&sub);
+    }
+    menu.init_for_nsapp();
+    menu
+}
+
 /// A file path given on the command line ("Open with QueryNest") becomes a SQLite URL.
 fn to_url(arg: String) -> String {
     let p = Path::new(&arg);
@@ -178,8 +217,17 @@ impl App {
             })
             .with_document_title_changed_handler(move |t| {
                 let _ = title.send_event(UserEvent::Title(id, t));
-            })
-            .build(&window)?;
+            });
+        // Linux: the webview lives inside the window's GTK box (works on X11 and Wayland).
+        #[cfg(target_os = "linux")]
+        let webview = {
+            use tao::platform::unix::WindowExtUnix;
+            use wry::WebViewBuilderExtUnix;
+            let vbox = window.default_vbox().ok_or_else(|| anyhow::anyhow!("no GTK container"))?;
+            webview.build_gtk(vbox)?
+        };
+        #[cfg(not(target_os = "linux"))]
+        let webview = webview.build(&window)?;
         if main {
             self.main_id = Some(id);
         }
@@ -205,6 +253,10 @@ fn main() -> anyhow::Result<()> {
 
     let event_loop = EventLoopBuilder::<UserEvent>::with_user_event().build();
     let proxy = event_loop.create_proxy();
+    // macOS: the app menu provides Quit and the Edit shortcuts (Cmd+C / Cmd+V / Cmd+Z …),
+    // which a WebView only receives through menu items.
+    #[cfg(target_os = "macos")]
+    let _menu = mac_menu();
     let mut app = App {
         base: base.clone(),
         token,

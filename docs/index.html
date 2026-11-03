@@ -113,6 +113,8 @@
     pre.code .k { color: var(--primary-light); }
     .card .btn { align-self: flex-start; margin-top: auto; }
 
+    .dl-alt { font-size: 13.5px; color: var(--muted); }
+    a.dl-alt:hover { color: var(--text); }
     footer { border-top: 1px solid rgba(255, 255, 255, 0.06); padding: 40px 0; color: var(--muted); font-size: 14px; }
     footer .wrap { display: flex; align-items: center; gap: 20px; flex-wrap: wrap; }
     footer .sp { flex: 1; }
@@ -138,26 +140,26 @@
         <a href="#start">Get started</a>
         <a href="https://github.com/byht1/querynest">GitHub</a>
       </div>
-      <a class="btn primary sm" href="https://github.com/byht1/querynest/releases/latest">Download</a>
+      <a class="btn primary sm" href="#downloads">Download</a>
     </div>
   </nav>
 
   <header class="hero">
     <div class="wrap">
       <div>
-        <span class="eyebrow"><b>New</b> v0.2.0 — native desktop app for Windows</span>
+        <span class="eyebrow"><b>New</b> v0.3.0 — Windows installer, macOS and Linux apps</span>
         <h1>Explore. Query.<br>Understand your <span class="grad">data.</span></h1>
         <p class="lead">QueryNest is a fast database explorer and query tool. Browse and edit tables, write SQL in a real editor, read JSON at a glance and manage your schema — in one small app.</p>
         <div class="cta">
-          <a class="btn primary" href="https://github.com/byht1/querynest/releases/latest/download/querynest.exe">
+          <a class="btn primary" id="dl-main" href="#downloads">
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3v12m0 0-5-5m5 5 5-5M4 19h16"/></svg>
-            Download for Windows
+            <span id="dl-main-text">Download</span>
           </a>
           <a class="btn ghost" href="https://github.com/byht1/querynest">
             <svg viewBox="0 0 24 24" fill="currentColor"><path d="M12 .5a11.5 11.5 0 0 0-3.64 22.41c.58.1.79-.25.79-.56v-2c-3.2.7-3.88-1.37-3.88-1.37-.53-1.33-1.28-1.69-1.28-1.69-1.05-.71.08-.7.08-.7 1.16.08 1.77 1.19 1.77 1.19 1.03 1.77 2.7 1.26 3.36.96.1-.75.4-1.26.73-1.55-2.55-.29-5.24-1.28-5.24-5.69 0-1.26.45-2.29 1.19-3.1-.12-.29-.52-1.46.11-3.05 0 0 .97-.31 3.17 1.18a11 11 0 0 1 5.77 0c2.2-1.49 3.17-1.18 3.17-1.18.63 1.59.23 2.76.11 3.05.74.81 1.19 1.84 1.19 3.1 0 4.42-2.7 5.4-5.26 5.68.41.36.78 1.06.78 2.14v3.17c0 .31.21.67.8.56A11.5 11.5 0 0 0 12 .5z"/></svg>
             View on GitHub
           </a>
-          <small>Windows 10/11 · single 13&nbsp;MB file · no installer · also runs in Docker</small>
+          <small id="dl-sub">Windows · macOS · Linux · also runs in Docker · <a href="#downloads">all downloads</a></small>
         </div>
         <div class="dbs"><span>PostgreSQL</span><span>MySQL</span><span>MariaDB</span><span>SQLite</span></div>
       </div>
@@ -257,6 +259,36 @@
     </div>
   </section>
 
+  <section id="downloads" style="padding-top: 24px">
+    <div class="wrap">
+      <div class="section-head">
+        <h2>Download</h2>
+        <p>Free and open source. Pick your system.</p>
+      </div>
+      <div class="cards">
+        <div class="card">
+          <h3>Windows 10/11</h3>
+          <p>The installer shows where the program and your data are stored, and adds Start menu and “Open with” entries.</p>
+          <a class="btn primary sm" href="https://github.com/byht1/querynest/releases/latest/download/QueryNest-Setup-x64.msi">Installer (.msi)</a>
+          <a class="dl-alt" href="https://github.com/byht1/querynest/releases/latest/download/querynest.exe">Portable .exe — no installation</a>
+        </div>
+        <div class="card">
+          <h3>macOS 11+</h3>
+          <p>Universal app for Apple Silicon and Intel. Drag QueryNest to Applications.</p>
+          <a class="btn primary sm" href="https://github.com/byht1/querynest/releases/latest/download/QueryNest-macOS-universal.dmg">Disk image (.dmg)</a>
+          <span class="dl-alt">Not notarized yet: right-click → Open the first time.</span>
+        </div>
+        <div class="card">
+          <h3>Linux</h3>
+          <p>Debian / Ubuntu package with a desktop entry, or a portable archive. Needs WebKitGTK 4.1.</p>
+          <a class="btn primary sm" href="https://github.com/byht1/querynest/releases/latest/download/querynest-linux-amd64.deb">Package (.deb)</a>
+          <a class="dl-alt" href="https://github.com/byht1/querynest/releases/latest/download/querynest-linux-x86_64.tar.gz">Portable .tar.gz</a>
+        </div>
+      </div>
+      <p class="gallery-caption">Web server builds and checksums: <a href="https://github.com/byht1/querynest/releases/latest">all release files</a>.</p>
+    </div>
+  </section>
+
   <section id="start">
     <div class="wrap">
       <div class="section-head">
@@ -266,10 +298,10 @@
       <div class="cards">
         <div class="card">
           <h3>Desktop app</h3>
-          <p>Download one file and run it. Open a SQLite file directly with “Open with → QueryNest”.</p>
+          <p>Install it, or run the portable file. Open a SQLite file directly with “Open with → QueryNest”.</p>
           <pre class="code"><span class="c"># or pass a database</span>
 querynest.exe C:\data\app.db</pre>
-          <a class="btn primary sm" href="https://github.com/byht1/querynest/releases/latest/download/querynest.exe">Download .exe</a>
+          <a class="btn primary sm" href="#downloads">Downloads</a>
         </div>
         <div class="card">
           <h3>Docker</h3>
@@ -304,6 +336,21 @@ cargo build --release</pre>
   </footer>
 
   <script>
+    // The main button downloads the right file for the visitor's system.
+    (() => {
+      const L = 'https://github.com/byht1/querynest/releases/latest/download/';
+      const ua = navigator.userAgent;
+      const os = /Windows/.test(ua) ? 'win' : /Mac OS X|Macintosh/.test(ua) ? 'mac' : /Linux|X11/.test(ua) && !/Android/.test(ua) ? 'linux' : null;
+      const map = {
+        win: ['QueryNest-Setup-x64.msi', 'Download for Windows'],
+        mac: ['QueryNest-macOS-universal.dmg', 'Download for macOS'],
+        linux: ['querynest-linux-amd64.deb', 'Download for Linux (.deb)'],
+      };
+      if (!os) return;
+      document.getElementById('dl-main').href = L + map[os][0];
+      document.getElementById('dl-main-text').textContent = map[os][1];
+    })();
+
     const shots = [
       ['grid.png', 'postgres — QueryNest', 'Browse any table: sort by several columns, filter, resize and hide columns, follow foreign keys.'],
       ['sql.png', 'postgres — QueryNest', 'Write SQL with highlighting and autocomplete. ▶ next to each statement runs just that one.'],

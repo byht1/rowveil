@@ -1,0 +1,12 @@
+[Desktop Entry]
+Type=Application
+Name=QueryNest
+GenericName=Database explorer
+Comment=Database explorer and query tool for PostgreSQL, MySQL and SQLite
+Exec=querynest %f
+Icon=querynest
+Terminal=false
+Categories=Development;Database;
+MimeType=application/vnd.sqlite3;application/x-sqlite3;
+Keywords=database;sql;postgres;postgresql;mysql;mariadb;sqlite;
+StartupWMClass=querynest

@@ -7,3 +7,5 @@ examples/*.db
 *.db-wal
 *.db-shm
 .querynest-probe-*
+/dist
+*.wixpdb

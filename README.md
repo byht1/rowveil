@@ -36,20 +36,44 @@ Database explorer & query tool. Окремий десктопний застос
 - Теми: QueryNest (за замовчуванням), QueryNest Light, Graphite, Paper, One Dark Pro, Dracula, Nord, GitHub Light (кнопка внизу сайдбару, прев'ю при наведенні).
 - Режим read-only. Опційний Basic Auth.
 
+## Встановлення
+
+Готові збірки — на сторінці [Releases](https://github.com/byht1/querynest/releases/latest) і на [сайті](https://byht1.github.io/querynest/#downloads).
+
+| Система | Файл | Як встановити |
+|---|---|---|
+| Windows 10/11 | `QueryNest-Setup-x64.msi` | Інсталятор: папка, ярлики, «Відкрити за допомогою» для `.db`, сторінка «де що зберігається» |
+| Windows | `querynest.exe` | Portable: один файл без встановлення |
+| macOS 11+ | `QueryNest-macOS-universal.dmg` | Перетягніть QueryNest у Applications. Перший запуск: правий клік → Open |
+| Debian / Ubuntu | `querynest-linux-amd64.deb` | `sudo apt install ./querynest-linux-amd64.deb` |
+| Інший Linux | `querynest-linux-x86_64.tar.gz` | Потрібні WebKitGTK 4.1 і GTK 3 (див. `README.txt` в архіві) |
+
+Де зберігаються дані (`connections.json` — підключення, паролі в URL відкритим текстом; `window.json`; `querynest.log`; `webview/`):
+
+| Система | Папка |
+|---|---|
+| Windows | `%APPDATA%\querynest\` |
+| macOS | `~/Library/Application Support/querynest/` |
+| Linux | `~/.config/querynest/` |
+
+Видалення програми папку з даними не чіпає.
+
 ## Десктопний застосунок
 
+- Власне вікно з іконкою QueryNest, без консолі й браузера. Рушій: WebView2 (Windows), WKWebView (macOS), WebKitGTK (Linux).
+- Кожне підключення можна відкрити в окремому вікні. Розмір і позиція головного вікна запам'ятовуються.
+- Експорт CSV / JSON відкриває системний діалог «Зберегти як»; після збереження — «Show in folder».
+- Базу можна передати аргументом: `querynest C:\data\app.db` або `querynest postgres://user:pass@host/db`.
+- Сервер усередині застосунку слухає лише `127.0.0.1` на випадковому порту й приймає запити тільки від свого вікна (секретний токен на кожен запуск).
+
+### Збірка з вихідного коду
+
 ```bash
-cargo build --release
+cargo build --release                       # Windows / macOS
+sudo apt install libwebkit2gtk-4.1-dev libgtk-3-dev && cargo build --release   # Linux
 ```
 
-Результат — один файл `target/release/querynest.exe` (≈ 15 МБ). Інсталятор не потрібен: скопіюйте файл куди завгодно й запускайте.
-
-- Власне вікно з іконкою QueryNest. Консолі й браузера немає. Інтерфейс показує WebView2 (вбудований у Windows 10/11).
-- Кожне підключення можна відкрити в окремому вікні. Розмір і позиція головного вікна запам'ятовуються.
-- Експорт CSV / JSON відкриває стандартний діалог «Зберегти як»; після збереження — «Show in folder».
-- Можна передати базу аргументом: `querynest.exe C:\data\app.db` або `querynest.exe postgres://user:pass@host/db`. Тому працює й «Відкрити за допомогою → QueryNest» для `.db`-файлів.
-- Сервер усередині застосунку слухає лише `127.0.0.1` на випадковому порту й приймає запити тільки від свого вікна (секретний токен на кожен запуск).
-- Дані: `%APPDATA%\querynest\` — `connections.json`, `window.json`, `querynest.log`, профіль WebView2.
+Пакети: `packaging/windows/build-msi.ps1` (WiX 5), `packaging/macos/build-dmg.sh`, `packaging/linux/package.sh`. Тег `v*` запускає `.github/workflows/release.yml`: збірка для всіх трьох систем, перевірка інсталяторів і чернетка релізу.
 
 ## Браузерна версія і Docker
 

@@ -442,14 +442,16 @@ async fn desktop_save(State(st): State<Shared>, Json(req): Json<SaveFileRequest>
     {
         let ext = std::path::Path::new(&req.filename).extension().and_then(|e| e.to_str()).unwrap_or("").to_string();
         let picked = tokio::task::spawn_blocking(move || {
-            let mut dialog = rfd::FileDialog::new().set_title("Save as").set_file_name(&req.filename);
+            // The async dialog hands the panel to the UI (main) thread where the OS needs it
+            // (macOS); this worker thread only waits for the answer.
+            let mut dialog = rfd::AsyncFileDialog::new().set_title("Save as").set_file_name(&req.filename);
             if let Some(dir) = dirs::download_dir() {
                 dialog = dialog.set_directory(dir);
             }
             if !ext.is_empty() {
                 dialog = dialog.add_filter(ext.to_uppercase(), &[ext.as_str()]);
             }
-            dialog.save_file().map(|p| (p, req.content))
+            futures::executor::block_on(dialog.save_file()).map(|h| (h.path().to_path_buf(), req.content))
         })
         .await
         .map_err(|e| anyhow::anyhow!("dialog failed: {e}"))?;
@@ -483,7 +485,11 @@ async fn desktop_reveal(State(st): State<Shared>, Json(req): Json<RevealRequest>
     {
         let _ = std::process::Command::new("explorer").arg(format!("/select,{}", path.display())).spawn();
     }
-    #[cfg(not(windows))]
+    #[cfg(target_os = "macos")]
+    {
+        let _ = std::process::Command::new("open").arg("-R").arg(&path).spawn();
+    }
+    #[cfg(not(any(windows, target_os = "macos")))]
     {
         let _ = open::that_detached(path.parent().unwrap_or(&path));
     }

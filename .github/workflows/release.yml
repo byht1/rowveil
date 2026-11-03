@@ -1,0 +1,126 @@
+name: Release
+
+# Push a tag (v1.2.3) to build every platform and attach the files to a draft release.
+# Run it by hand (workflow_dispatch) to only build and keep the files as workflow artifacts.
+on:
+  push:
+    tags: ['v*']
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  windows:
+    name: Windows (exe + MSI)
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
+      - run: cargo build --release
+      - name: Install WiX 5
+        run: dotnet tool install --global wix --version 5.0.2
+      - name: Build MSI
+        shell: pwsh
+        run: ./packaging/windows/build-msi.ps1
+      - name: Smoke-test the MSI (install, check, uninstall)
+        shell: pwsh
+        run: |
+          $msi = (Get-ChildItem target/release/QueryNest-*-x64.msi | Select-Object -First 1).FullName
+          $p = Start-Process msiexec -ArgumentList "/i `"$msi`" /qn /l*v install.log" -Wait -PassThru
+          if ($p.ExitCode -ne 0) { Get-Content install.log -Tail 60; throw "install failed: $($p.ExitCode)" }
+          $checks = @{
+            'program'    = "$env:ProgramFiles\QueryNest\querynest.exe"
+            'start menu' = "$env:ProgramData\Microsoft\Windows\Start Menu\Programs\QueryNest.lnk"
+            'desktop'    = "$env:PUBLIC\Desktop\QueryNest.lnk"
+            'open with'  = 'Registry::HKEY_LOCAL_MACHINE\Software\Classes\QueryNest.SQLiteDatabase\shell\open\command'
+          }
+          foreach ($k in $checks.Keys) { if (-not (Test-Path $checks[$k])) { throw "missing after install: $k ($($checks[$k]))" } }
+          if (Test-Path "$env:ProgramFiles\QueryNest\querynest-server.exe") { throw 'optional web server was installed by default' }
+          $p = Start-Process msiexec -ArgumentList "/x `"$msi`" /qn" -Wait -PassThru
+          if ($p.ExitCode -ne 0) { throw "uninstall failed: $($p.ExitCode)" }
+          foreach ($k in $checks.Keys) { if (Test-Path $checks[$k]) { throw "left after uninstall: $k" } }
+          Write-Host 'MSI install/uninstall OK'
+      - name: Collect files
+        shell: pwsh
+        run: |
+          New-Item -ItemType Directory dist | Out-Null
+          Copy-Item target/release/querynest.exe dist/querynest.exe
+          Copy-Item target/release/querynest-server.exe dist/querynest-server-windows-x86_64.exe
+          Copy-Item (Get-ChildItem target/release/QueryNest-*-x64.msi | Select-Object -First 1).FullName dist/QueryNest-Setup-x64.msi
+      - uses: actions/upload-artifact@v4
+        with:
+          name: windows
+          path: dist/*
+
+  macos:
+    name: macOS (universal dmg)
+    runs-on: macos-14
+    env:
+      MACOSX_DEPLOYMENT_TARGET: '11.0'
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: aarch64-apple-darwin,x86_64-apple-darwin
+      - uses: Swatinem/rust-cache@v2
+      - run: cargo build --release --target aarch64-apple-darwin
+      - run: cargo build --release --target x86_64-apple-darwin
+      - run: bash packaging/macos/build-dmg.sh
+      - name: Smoke-test the app bundle
+        run: |
+          hdiutil attach dist/QueryNest-macOS-universal.dmg -mountpoint /tmp/qn -nobrowse
+          lipo -archs /tmp/qn/QueryNest.app/Contents/MacOS/querynest
+          codesign --verify --deep /tmp/qn/QueryNest.app
+          /tmp/qn/QueryNest.app/Contents/MacOS/querynest --version
+          hdiutil detach /tmp/qn
+          ./dist/querynest-server-macos-universal --version
+      - uses: actions/upload-artifact@v4
+        with:
+          name: macos
+          path: dist/*
+
+  linux:
+    name: Linux (deb + tar.gz)
+    runs-on: ubuntu-22.04
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install WebKitGTK
+        run: sudo apt-get update && sudo apt-get install -y libwebkit2gtk-4.1-dev libgtk-3-dev
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
+      - run: cargo build --release
+      - run: bash packaging/linux/package.sh
+      - name: Smoke-test the package
+        run: |
+          sudo apt-get install -y ./dist/querynest-linux-amd64.deb
+          querynest --version
+          querynest-server --version
+      - uses: actions/upload-artifact@v4
+        with:
+          name: linux
+          path: dist/*
+
+  publish:
+    name: Draft release
+    needs: [windows, macos, linux]
+    if: startsWith(github.ref, 'refs/tags/')
+    runs-on: ubuntu-latest
+    env:
+      GH_TOKEN: ${{ github.token }}
+      TAG: ${{ github.ref_name }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/download-artifact@v4
+        with:
+          path: dist
+          merge-multiple: true
+      - name: Checksums
+        run: cd dist && sha256sum * > SHA256SUMS.txt && cat SHA256SUMS.txt
+      - name: Create or update the draft release
+        run: |
+          if ! gh release view "$TAG" >/dev/null 2>&1; then
+            gh release create "$TAG" --draft --title "QueryNest ${TAG#v}" --notes-file packaging/release-notes.md
+          fi
+          gh release upload "$TAG" dist/* --clobber

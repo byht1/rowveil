@@ -3,3 +3,4 @@
 *.ico binary
 *.db binary
 *.rgba binary
+*.bmp binary

@@ -1,5 +1,5 @@
 {
-  "name": "querynest-ui-vendor",
+  "name": "roostbase-ui-vendor",
   "private": true,
   "description": "Builds static/vendor/codemirror.js (CodeMirror 6 + sql-formatter) embedded into the Rust binary",
   "type": "module",

@@ -595,8 +595,8 @@ select.input { padding-right: 4px; }
 .toast.hide { opacity: 0; transform: translateY(6px); }
 
 
-/* QueryNest brand themes (brand pack: assets/brand/colors.json) */
-:root[data-theme="querynest"] {
+/* Roostbase brand themes (brand pack: assets/brand/colors.json) */
+:root[data-theme="roostbase"] {
   --bg: #0b0b1a;
   --panel: #10101f;
   --panel-2: #151529;
@@ -635,7 +635,7 @@ select.input { padding-right: 4px; }
   color-scheme: dark;
 }
 
-:root[data-theme="querynest-light"] {
+:root[data-theme="roostbase-light"] {
   --bg: #ffffff;
   --panel: #faf9ff;
   --panel-2: #f3f1fd;
@@ -677,7 +677,7 @@ select.input { padding-right: 4px; }
 /* brand mark */
 .brand .brand-mark { width: 18px; height: 18px; flex: none; }
 .brand .brand-name { font-weight: 700; letter-spacing: -0.01em; }
-.brand-nest, .welcome-title .brand-nest {
+.brand-accent, .welcome-title .brand-accent {
   background: linear-gradient(135deg, #a78bfa, #7c3aed);
   -webkit-background-clip: text; background-clip: text; color: transparent;
 }

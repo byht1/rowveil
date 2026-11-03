@@ -1,11 +1,11 @@
-//! QueryNest desktop app: the studio in its own native window (WebView2 on Windows),
+//! Roostbase desktop app: the studio in its own native window (WebView2 on Windows),
 //! without a console or a browser. The HTTP server runs inside the process on a random
 //! loopback port and accepts only requests that carry a per-launch secret.
 
 #![cfg_attr(all(windows, not(debug_assertions)), windows_subsystem = "windows")]
 
 use clap::Parser;
-use querynest::{default_data_dir, router, Options};
+use roostbase::{default_data_dir, router, Options};
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::path::{Path, PathBuf};
@@ -15,11 +15,11 @@ use tao::event_loop::{ControlFlow, EventLoopBuilder, EventLoopProxy, EventLoopWi
 use tao::window::{Icon, Window, WindowBuilder, WindowId};
 use wry::{NewWindowResponse, WebContext, WebView, WebViewBuilder};
 
-const APP_NAME: &str = "QueryNest";
+const APP_NAME: &str = "Roostbase";
 const ICON_RGBA: &[u8] = include_bytes!("../../assets/window-icon-64.rgba");
 
 #[derive(Parser, Debug)]
-#[command(name = "querynest", version, about = "QueryNest: database explorer and query tool")]
+#[command(name = "roostbase", version, about = "Roostbase: database explorer and query tool")]
 struct Cli {
     /// Database URL or path to a SQLite file to open on start.
     #[arg(env = "DATABASE_URL")]
@@ -69,8 +69,8 @@ fn save_window_state(path: &Path, window: &Window) {
 
 fn init_logging(data_dir: &Path) {
     let _ = std::fs::create_dir_all(data_dir);
-    let filter = tracing_subscriber::EnvFilter::try_from_default_env().unwrap_or_else(|_| "querynest=info,warn".into());
-    match std::fs::File::create(data_dir.join("querynest.log")) {
+    let filter = tracing_subscriber::EnvFilter::try_from_default_env().unwrap_or_else(|_| "roostbase=info,warn".into());
+    match std::fs::File::create(data_dir.join("roostbase.log")) {
         Ok(file) => tracing_subscriber::fmt().with_env_filter(filter).with_ansi(false).with_writer(std::sync::Mutex::new(file)).init(),
         Err(_) => tracing_subscriber::fmt().with_env_filter(filter).init(),
     }
@@ -115,7 +115,7 @@ fn mac_menu() -> muda::Menu {
     menu
 }
 
-/// A file path given on the command line ("Open with QueryNest") becomes a SQLite URL.
+/// A file path given on the command line ("Open with Roostbase") becomes a SQLite URL.
 fn to_url(arg: String) -> String {
     let p = Path::new(&arg);
     if !arg.contains("://") && p.is_file() {
@@ -132,7 +132,7 @@ fn start_server(opts: Options) -> anyhow::Result<String> {
     let listener = std::net::TcpListener::bind("127.0.0.1:0")?;
     listener.set_nonblocking(true)?;
     let port = listener.local_addr()?.port();
-    std::thread::Builder::new().name("querynest-server".into()).spawn(move || {
+    std::thread::Builder::new().name("roostbase-server".into()).spawn(move || {
         let rt = tokio::runtime::Builder::new_multi_thread().enable_all().build().expect("tokio runtime");
         rt.block_on(async move {
             let (app, store) = router(&opts);

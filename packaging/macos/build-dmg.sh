@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Builds QueryNest.app (universal: Apple Silicon + Intel) and a .dmg.
+# Builds Roostbase.app (universal: Apple Silicon + Intel) and a .dmg.
 # Run on macOS after:
 #   cargo build --release --target aarch64-apple-darwin
 #   cargo build --release --target x86_64-apple-darwin
@@ -10,36 +10,36 @@ dist="$root/dist"
 work="$(mktemp -d)"
 mkdir -p "$dist"
 
-lipo -create -output "$work/querynest" \
-  "$root/target/aarch64-apple-darwin/release/querynest" "$root/target/x86_64-apple-darwin/release/querynest"
-lipo -create -output "$dist/querynest-server-macos-universal" \
-  "$root/target/aarch64-apple-darwin/release/querynest-server" "$root/target/x86_64-apple-darwin/release/querynest-server"
+lipo -create -output "$work/roostbase" \
+  "$root/target/aarch64-apple-darwin/release/roostbase" "$root/target/x86_64-apple-darwin/release/roostbase"
+lipo -create -output "$dist/roostbase-server-macos-universal" \
+  "$root/target/aarch64-apple-darwin/release/roostbase-server" "$root/target/x86_64-apple-darwin/release/roostbase-server"
 
 # ---- icon
-iconset="$work/querynest.iconset"
+iconset="$work/roostbase.iconset"
 mkdir -p "$iconset"
-src="$root/assets/icons/querynest-1024.png"
+src="$root/assets/icons/roostbase-1024.png"
 for s in 16 32 128 256 512; do
   sips -z $s $s "$src" --out "$iconset/icon_${s}x${s}.png" >/dev/null
   sips -z $((s * 2)) $((s * 2)) "$src" --out "$iconset/icon_${s}x${s}@2x.png" >/dev/null
 done
-iconutil -c icns "$iconset" -o "$work/querynest.icns"
+iconutil -c icns "$iconset" -o "$work/roostbase.icns"
 
 # ---- app bundle
-app="$work/QueryNest.app"
+app="$work/Roostbase.app"
 mkdir -p "$app/Contents/MacOS" "$app/Contents/Resources"
-cp "$work/querynest" "$app/Contents/MacOS/querynest"
-cp "$work/querynest.icns" "$app/Contents/Resources/querynest.icns"
+cp "$work/roostbase" "$app/Contents/MacOS/roostbase"
+cp "$work/roostbase.icns" "$app/Contents/Resources/roostbase.icns"
 cat > "$app/Contents/Info.plist" <<PLIST
 <?xml version="1.0" encoding="UTF-8"?>
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
 <plist version="1.0">
 <dict>
-  <key>CFBundleName</key><string>QueryNest</string>
-  <key>CFBundleDisplayName</key><string>QueryNest</string>
-  <key>CFBundleIdentifier</key><string>io.github.byht1.querynest</string>
-  <key>CFBundleExecutable</key><string>querynest</string>
-  <key>CFBundleIconFile</key><string>querynest</string>
+  <key>CFBundleName</key><string>Roostbase</string>
+  <key>CFBundleDisplayName</key><string>Roostbase</string>
+  <key>CFBundleIdentifier</key><string>io.github.byht1.roostbase</string>
+  <key>CFBundleExecutable</key><string>roostbase</string>
+  <key>CFBundleIconFile</key><string>roostbase</string>
   <key>CFBundlePackageType</key><string>APPL</string>
   <key>CFBundleShortVersionString</key><string>$version</string>
   <key>CFBundleVersion</key><string>$version</string>
@@ -58,5 +58,5 @@ stage="$work/dmg"
 mkdir -p "$stage"
 cp -R "$app" "$stage/"
 ln -s /Applications "$stage/Applications"
-hdiutil create -volname "QueryNest $version" -srcfolder "$stage" -ov -format UDZO "$dist/QueryNest-macOS-universal.dmg"
+hdiutil create -volname "Roostbase $version" -srcfolder "$stage" -ov -format UDZO "$dist/Roostbase-macOS-universal.dmg"
 ls -la "$dist"

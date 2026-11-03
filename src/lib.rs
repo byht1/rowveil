@@ -1,4 +1,4 @@
-//! QueryNest: database explorer and query tool (server + embedded web UI).
+//! Roostbase: database explorer and query tool (server + embedded web UI).
 
 pub mod access;
 pub mod config;
@@ -39,16 +39,21 @@ pub struct Options {
     pub app_token: Option<String>,
 }
 
-/// Default directory for saved connections. Moves `connections.json` from the old
-/// "rust-studio" directory on first start.
+/// Default directory for saved connections. On first start, copies `connections.json`
+/// from the directories of the app's earlier names ("querynest", "rust-studio").
 pub fn default_data_dir() -> PathBuf {
-    let Some(base) = dirs::config_dir() else { return PathBuf::from(".querynest") };
-    let dir = base.join("querynest");
-    let old = base.join("rust-studio").join("connections.json");
+    let Some(base) = dirs::config_dir() else { return PathBuf::from(".roostbase") };
+    let dir = base.join("roostbase");
     let new = dir.join("connections.json");
-    if !new.exists() && old.exists() {
-        let _ = std::fs::create_dir_all(&dir);
-        let _ = std::fs::copy(&old, &new);
+    if !new.exists() {
+        for old_name in ["querynest", "rust-studio"] {
+            let old = base.join(old_name).join("connections.json");
+            if old.exists() {
+                let _ = std::fs::create_dir_all(&dir);
+                let _ = std::fs::copy(&old, &new);
+                break;
+            }
+        }
     }
     dir
 }
@@ -121,7 +126,7 @@ impl AppState {
     /// Why the connection cannot change data, or None when it can.
     async fn read_only_reason(&self, id: &str) -> ApiResult<Option<String>> {
         if self.read_only {
-            return Ok(Some("QueryNest runs in read-only mode".into()));
+            return Ok(Some("Roostbase runs in read-only mode".into()));
         }
         if self.conn(id).await?.read_only {
             return Ok(Some("Connection is read-only".into()));
@@ -498,7 +503,7 @@ async fn desktop_reveal(State(st): State<Shared>, Json(req): Json<RevealRequest>
 
 // ---------- auth ----------
 
-const TOKEN_COOKIE: &str = "qn_token";
+const TOKEN_COOKIE: &str = "rb_token";
 
 /// Desktop mode: the window opens `/?token=…` once; the server answers with an HttpOnly
 /// cookie, and every later request must carry it. Other local processes get 403.
@@ -513,7 +518,7 @@ async fn app_token_guard(State(st): State<Shared>, headers: HeaderMap, req: Requ
         .iter()
         .filter_map(|v| v.to_str().ok())
         .flat_map(|v| v.split(';'))
-        .any(|c| c.trim().strip_prefix("qn_token=") == Some(token.as_str()));
+        .any(|c| c.trim().strip_prefix("rb_token=") == Some(token.as_str()));
     if from_query {
         let mut res = next.run(req).await;
         if let Ok(v) = HeaderValue::from_str(&format!("{TOKEN_COOKIE}={token}; HttpOnly; SameSite=Strict; Path=/")) {
@@ -524,7 +529,7 @@ async fn app_token_guard(State(st): State<Shared>, headers: HeaderMap, req: Requ
     if from_cookie {
         return next.run(req).await;
     }
-    (StatusCode::FORBIDDEN, "QueryNest: this server belongs to a desktop window").into_response()
+    (StatusCode::FORBIDDEN, "Roostbase: this server belongs to a desktop window").into_response()
 }
 
 
@@ -539,7 +544,7 @@ async fn basic_auth(State(st): State<Shared>, headers: HeaderMap, req: Request, 
     }
     let mut res = StatusCode::UNAUTHORIZED.into_response();
     res.headers_mut()
-        .insert(header::WWW_AUTHENTICATE, HeaderValue::from_static("Basic realm=\"QueryNest\""));
+        .insert(header::WWW_AUTHENTICATE, HeaderValue::from_static("Basic realm=\"Roostbase\""));
     res
 }
 

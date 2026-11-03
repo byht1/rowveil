@@ -27,17 +27,17 @@ jobs:
       - name: Smoke-test the MSI (install, check, uninstall)
         shell: pwsh
         run: |
-          $msi = (Get-ChildItem target/release/QueryNest-*-x64.msi | Select-Object -First 1).FullName
+          $msi = (Get-ChildItem target/release/Roostbase-*-x64.msi | Select-Object -First 1).FullName
           $p = Start-Process msiexec -ArgumentList "/i `"$msi`" /qn /l*v install.log" -Wait -PassThru
           if ($p.ExitCode -ne 0) { Get-Content install.log -Tail 60; throw "install failed: $($p.ExitCode)" }
           $checks = @{
-            'program'    = "$env:ProgramFiles\QueryNest\querynest.exe"
-            'start menu' = "$env:ProgramData\Microsoft\Windows\Start Menu\Programs\QueryNest.lnk"
-            'desktop'    = "$env:PUBLIC\Desktop\QueryNest.lnk"
-            'open with'  = 'Registry::HKEY_LOCAL_MACHINE\Software\Classes\QueryNest.SQLiteDatabase\shell\open\command'
+            'program'    = "$env:ProgramFiles\Roostbase\roostbase.exe"
+            'start menu' = "$env:ProgramData\Microsoft\Windows\Start Menu\Programs\Roostbase.lnk"
+            'desktop'    = "$env:PUBLIC\Desktop\Roostbase.lnk"
+            'open with'  = 'Registry::HKEY_LOCAL_MACHINE\Software\Classes\Roostbase.SQLiteDatabase\shell\open\command'
           }
           foreach ($k in $checks.Keys) { if (-not (Test-Path $checks[$k])) { throw "missing after install: $k ($($checks[$k]))" } }
-          if (Test-Path "$env:ProgramFiles\QueryNest\querynest-server.exe") { throw 'optional web server was installed by default' }
+          if (Test-Path "$env:ProgramFiles\Roostbase\roostbase-server.exe") { throw 'optional web server was installed by default' }
           $p = Start-Process msiexec -ArgumentList "/x `"$msi`" /qn" -Wait -PassThru
           if ($p.ExitCode -ne 0) { throw "uninstall failed: $($p.ExitCode)" }
           foreach ($k in $checks.Keys) { if (Test-Path $checks[$k]) { throw "left after uninstall: $k" } }
@@ -46,9 +46,9 @@ jobs:
         shell: pwsh
         run: |
           New-Item -ItemType Directory dist | Out-Null
-          Copy-Item target/release/querynest.exe dist/querynest.exe
-          Copy-Item target/release/querynest-server.exe dist/querynest-server-windows-x86_64.exe
-          Copy-Item (Get-ChildItem target/release/QueryNest-*-x64.msi | Select-Object -First 1).FullName dist/QueryNest-Setup-x64.msi
+          Copy-Item target/release/roostbase.exe dist/roostbase.exe
+          Copy-Item target/release/roostbase-server.exe dist/roostbase-server-windows-x86_64.exe
+          Copy-Item (Get-ChildItem target/release/Roostbase-*-x64.msi | Select-Object -First 1).FullName dist/Roostbase-Setup-x64.msi
       - uses: actions/upload-artifact@v4
         with:
           name: windows
@@ -70,12 +70,12 @@ jobs:
       - run: bash packaging/macos/build-dmg.sh
       - name: Smoke-test the app bundle
         run: |
-          hdiutil attach dist/QueryNest-macOS-universal.dmg -mountpoint /tmp/qn -nobrowse
-          lipo -archs /tmp/qn/QueryNest.app/Contents/MacOS/querynest
-          codesign --verify --deep /tmp/qn/QueryNest.app
-          /tmp/qn/QueryNest.app/Contents/MacOS/querynest --version
+          hdiutil attach dist/Roostbase-macOS-universal.dmg -mountpoint /tmp/qn -nobrowse
+          lipo -archs /tmp/qn/Roostbase.app/Contents/MacOS/roostbase
+          codesign --verify --deep /tmp/qn/Roostbase.app
+          /tmp/qn/Roostbase.app/Contents/MacOS/roostbase --version
           hdiutil detach /tmp/qn
-          ./dist/querynest-server-macos-universal --version
+          ./dist/roostbase-server-macos-universal --version
       - uses: actions/upload-artifact@v4
         with:
           name: macos
@@ -94,9 +94,9 @@ jobs:
       - run: bash packaging/linux/package.sh
       - name: Smoke-test the package
         run: |
-          sudo apt-get install -y ./dist/querynest-linux-amd64.deb
-          querynest --version
-          querynest-server --version
+          sudo apt-get install -y ./dist/roostbase-linux-amd64.deb
+          roostbase --version
+          roostbase-server --version
       - uses: actions/upload-artifact@v4
         with:
           name: linux
@@ -121,6 +121,6 @@ jobs:
       - name: Create or update the draft release
         run: |
           if ! gh release view "$TAG" >/dev/null 2>&1; then
-            gh release create "$TAG" --draft --title "QueryNest ${TAG#v}" --notes-file packaging/release-notes.md
+            gh release create "$TAG" --draft --title "Roostbase ${TAG#v}" --notes-file packaging/release-notes.md
           fi
           gh release upload "$TAG" dist/* --clobber

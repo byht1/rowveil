@@ -1,4 +1,4 @@
--- QueryNest testbed: SQLite 3.37+.
+-- Roostbase testbed: SQLite 3.37+.
 -- Type affinities, booleans as 0/1, JSON stored as TEXT, BLOBs, big integers, composite keys,
 -- WITHOUT ROWID and STRICT tables, a generated column, a table without a declared primary key,
 -- awkward identifiers, wide and long tables, views, indexes and a trigger.
@@ -240,7 +240,7 @@ FROM seq;
 WITH RECURSIVE seq(g) AS (SELECT 1 UNION ALL SELECT g + 1 FROM seq WHERE g < 5000)
 INSERT INTO page_views (user_id, path, referrer, country, ms, is_bot, viewed_at)
 SELECT CASE WHEN g % 4 = 0 THEN NULL ELSE 1 + g % 240 END,
-  CASE g % 6 WHEN 0 THEN '/' WHEN 1 THEN '/pricing' WHEN 2 THEN '/docs' WHEN 3 THEN '/blog/querynest' WHEN 4 THEN '/login' ELSE '/товари' END,
+  CASE g % 6 WHEN 0 THEN '/' WHEN 1 THEN '/pricing' WHEN 2 THEN '/docs' WHEN 3 THEN '/blog/roostbase' WHEN 4 THEN '/login' ELSE '/товари' END,
   CASE WHEN g % 3 = 0 THEN 'https://google.com/search?q=' || g END,
   CASE g % 5 WHEN 0 THEN 'UA' WHEN 1 THEN 'US' WHEN 2 THEN 'DE' WHEN 3 THEN 'PL' END,
   20 + (g * 31) % 4000, g % 19 = 0,

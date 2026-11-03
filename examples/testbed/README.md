@@ -1,21 +1,21 @@
-# Тестовий стенд QueryNest
+# Тестовий стенд Roostbase
 
-Три бази з однаковою предметною областю (організації, користувачі, замовлення). Дані покривають усі функції QueryNest.
+Три бази з однаковою предметною областю (організації, користувачі, замовлення). Дані покривають усі функції Roostbase.
 
 ## Запуск
 
-Усе разом — PostgreSQL, MySQL і QueryNest (веб) у Docker:
+Усе разом — PostgreSQL, MySQL і Roostbase (веб) у Docker:
 
 ```bash
 docker compose -f examples/testbed/docker-compose.yml up -d --build
 # відкрийте http://localhost:4984
 ```
 
-Тільки бази, для QueryNest, запущеного локально:
+Тільки бази, для Roostbase, запущеного локально:
 
 ```bash
 docker compose -f examples/testbed/docker-compose.yml up -d postgres mysql
-./target/release/querynest.exe      # або querynest-server
+./target/release/roostbase.exe      # або roostbase-server
 ```
 
 | База | URL |

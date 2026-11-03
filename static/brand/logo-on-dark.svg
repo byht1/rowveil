@@ -29,6 +29,5 @@
   <path d="M214 274h44" stroke="#6D28D9" stroke-width="16" stroke-linecap="round"/>
 </g>
 </g>
-<text x="355" y="198" font-family="Inter,Segoe UI,Arial,sans-serif" font-size="118" font-weight="800" fill="#F8FAFC">Query</text>
-<text x="682" y="198" font-family="Inter,Segoe UI,Arial,sans-serif" font-size="118" font-weight="800" fill="url(#tg)">Nest</text>
+<text x="355" y="198" font-family="Inter,Segoe UI,Arial,sans-serif" font-size="118" font-weight="800"><tspan fill="#F8FAFC">Roost</tspan><tspan fill="url(#tg)">base</tspan></text>
 </svg>

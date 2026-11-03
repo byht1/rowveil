@@ -6,6 +6,6 @@ examples/*.db
 *.db-journal
 *.db-wal
 *.db-shm
-.querynest-probe-*
+.roostbase-probe-*
 /dist
 *.wixpdb

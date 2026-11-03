@@ -1,9 +1,9 @@
-# QueryNest (web) + a demo PostgreSQL database.
+# Roostbase (web) + a demo PostgreSQL database.
 #   docker compose up -d --build   ->  open http://localhost:4983
 services:
-  querynest:
+  roostbase:
     build: .
-    image: querynest:latest
+    image: roostbase:latest
     ports:
       - "4983:4983"
     environment:
@@ -14,7 +14,7 @@ services:
       # Optional basic auth:
       # STUDIO_PASSWORD: change-me
     volumes:
-      - querynest-data:/data            # saved connections
+      - roostbase-data:/data            # saved connections
       # - ./my.db:/db/my.db           # SQLite file -> DATABASE_URL_FILE: sqlite:///db/my.db
     extra_hosts:
       - "host.docker.internal:host-gateway"
@@ -35,4 +35,4 @@ services:
       retries: 20
 
 volumes:
-  querynest-data:
+  roostbase-data:

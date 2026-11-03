@@ -1,9 +1,9 @@
 <!doctype html>
-<html lang="en" data-theme="querynest">
+<html lang="en" data-theme="roostbase">
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>QueryNest</title>
+  <title>Roostbase</title>
   <link rel="icon" href="/favicon.svg" type="image/svg+xml">
   <link rel="alternate icon" href="/favicon.ico" sizes="16x16 32x32 48x48">
   <meta name="theme-color" content="#8B5CF6">
@@ -14,6 +14,7 @@
       const raw = localStorage.getItem('rs.theme');
       let t = raw;
       try { t = JSON.parse(raw); } catch {}
+      if (t === 'querynest') t = 'roostbase'; else if (t === 'querynest-light') t = 'roostbase-light';
       if (typeof t === 'string' && t) document.documentElement.dataset.theme = t;
     } catch {}
   </script>

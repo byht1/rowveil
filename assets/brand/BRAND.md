@@ -1,15 +1,15 @@
-# QueryNest Brand Pack
+# Roostbase Brand Pack
 
-Ready-to-use assets for the QueryNest website, desktop app, PWA and social previews.
+Ready-to-use assets for the Roostbase website, desktop app, PWA and social previews.
 
 ## Recommended usage
 
-- **Main website header:** `logo/querynest-horizontal-dark.svg` on a dark background or `querynest-horizontal-light.svg` on a light background.
-- **App icon:** `icons/app/querynest-512.png` or `querynest-1024.png`.
+- **Main website header:** `logo/roostbase-horizontal-dark.svg` on a dark background or `roostbase-horizontal-light.svg` on a light background.
+- **App icon:** `icons/app/roostbase-512.png` or `roostbase-1024.png`.
 - **Favicon:** `icons/favicon/favicon.ico` plus 16/32/48 px PNGs.
 - **PWA:** `icons/app/icon-192.png`, `icons/app/icon-512.png` and `web/manifest.webmanifest`.
-- **Open Graph / social preview:** `social/querynest-og-1200x630.png`.
-- **Design tokens:** `web/querynest-tokens.css` and `brand/colors.json`.
+- **Open Graph / social preview:** `social/roostbase-og-1200x630.png`.
+- **Design tokens:** `web/roostbase-tokens.css` and `brand/colors.json`.
 
 ## Brand idea
 
@@ -34,7 +34,7 @@ The mark combines three ideas:
 
 ## Typography
 
-Use **Inter** where available. For native/desktop UI, the fallback stack in `querynest-tokens.css` is recommended.
+Use **Inter** where available. For native/desktop UI, the fallback stack in `roostbase-tokens.css` is recommended.
 
 ## Minimum logo guidance
 

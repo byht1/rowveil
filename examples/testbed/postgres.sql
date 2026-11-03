@@ -1,4 +1,4 @@
--- QueryNest testbed: PostgreSQL.
+-- Roostbase testbed: PostgreSQL.
 -- Covers every studio feature: schemas, enums, identity/serial, generated columns, arrays,
 -- jsonb and JSON stored as TEXT, big integers, composite keys, tables without a primary key,
 -- awkward identifiers, wide and long tables, views, a materialized view, indexes of every kind,
@@ -311,7 +311,7 @@ FROM generate_series(1, 60) g;
 INSERT INTO page_views (user_id, path, referrer, country, ms, is_bot, viewed_at)
 SELECT
   CASE WHEN g % 4 = 0 THEN NULL ELSE 1 + g % 240 END,
-  (ARRAY['/', '/pricing', '/docs', '/blog/querynest', '/login', '/товари'])[1 + g % 6],
+  (ARRAY['/', '/pricing', '/docs', '/blog/roostbase', '/login', '/товари'])[1 + g % 6],
   CASE WHEN g % 3 = 0 THEN 'https://google.com/search?q=' || g END,
   (ARRAY['UA', 'US', 'DE', 'PL', NULL])[1 + g % 5],
   20 + (g * 31) % 4000,

@@ -1,28 +1,28 @@
 [package]
-name = "querynest"
+name = "roostbase"
 version = "0.3.0"
 edition = "2021"
-description = "QueryNest: database explorer and query tool for PostgreSQL, MySQL and SQLite"
+description = "Roostbase: database explorer and query tool for PostgreSQL, MySQL and SQLite"
 license = "MIT"
-default-run = "querynest"
-repository = "https://github.com/byht1/querynest"
-homepage = "https://byht1.github.io/querynest/"
+default-run = "roostbase"
+repository = "https://github.com/byht1/roostbase"
+homepage = "https://byht1.github.io/roostbase/"
 readme = "README.md"
 keywords = ["database", "sql", "postgresql", "mysql", "sqlite"]
 
 [lib]
-name = "querynest"
+name = "roostbase"
 path = "src/lib.rs"
 
 # Desktop app: its own window (WebView2 on Windows), no console, no browser.
 [[bin]]
-name = "querynest"
+name = "roostbase"
 path = "src/bin/desktop.rs"
 required-features = ["desktop"]
 
 # Web server: the UI in a browser; used by Docker.
 [[bin]]
-name = "querynest-server"
+name = "roostbase-server"
 path = "src/main.rs"
 
 [features]

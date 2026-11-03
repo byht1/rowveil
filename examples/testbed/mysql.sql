@@ -1,4 +1,4 @@
--- QueryNest testbed: MySQL 8 / MariaDB 10.5+.
+-- Roostbase testbed: MySQL 8 / MariaDB 10.5+.
 -- Enums, JSON, JSON stored as TEXT, generated columns, CHECK constraints, unsigned big integers,
 -- composite keys, a table without a primary key, awkward identifiers, wide and long tables,
 -- views, a trigger and a second database.
@@ -246,7 +246,7 @@ FROM seq;
 
 INSERT INTO page_views (user_id, path, referrer, country, ms, is_bot, viewed_at)
 WITH RECURSIVE seq (g) AS (SELECT 1 UNION ALL SELECT g + 1 FROM seq WHERE g < 5000)
-SELECT IF(g % 4 = 0, NULL, 1 + g % 240), ELT(1 + g % 6, '/', '/pricing', '/docs', '/blog/querynest', '/login', '/товари'),
+SELECT IF(g % 4 = 0, NULL, 1 + g % 240), ELT(1 + g % 6, '/', '/pricing', '/docs', '/blog/roostbase', '/login', '/товари'),
   IF(g % 3 = 0, CONCAT('https://google.com/search?q=', g), NULL), ELT(1 + g % 5, 'UA', 'US', 'DE', 'PL', NULL),
   20 + (g * 31) % 4000, g % 19 = 0, NOW() - INTERVAL ((g * 7) % 43200) MINUTE
 FROM seq;

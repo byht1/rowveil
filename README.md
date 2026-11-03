@@ -134,3 +134,7 @@ npm install
 npm run build
 ```
 Тестові дані: `examples/testbed/` (див. вище) і короткі сиди `examples/*-seed.sql`.
+
+## Ліцензія
+
+[MIT](LICENSE)

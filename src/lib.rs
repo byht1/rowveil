@@ -1,11 +1,14 @@
 //! Rowveil: database explorer and query tool (server + embedded web UI).
 
 pub mod access;
+pub mod bigquery;
 pub mod config;
 pub mod data;
 pub mod ddl;
 pub mod db;
+pub mod kv;
 pub mod schema;
+pub mod update;
 
 use axum::extract::{Path, Query, Request, State};
 use axum::http::{header, HeaderMap, HeaderValue, StatusCode};
@@ -66,6 +69,7 @@ struct AppState {
     read_only: bool,
     auth: Option<String>,
     app_token: Option<String>,
+    updater: Arc<update::Updater>,
 }
 
 type Shared = Arc<AppState>;
@@ -156,6 +160,13 @@ impl AppState {
             return Ok(Vec::new());
         }
         Ok(access::write_blockers(&path))
+    }
+
+    async fn redis(&self, id: &str) -> ApiResult<Arc<kv::Redis>> {
+        match self.db(id).await? {
+            Db::Redis(r) => Ok(r),
+            _ => Err(ApiError(StatusCode::BAD_REQUEST, "Not a Redis connection".into())),
+        }
     }
 
     /// Drops the cached pool and schema so the next request reconnects.
@@ -273,6 +284,20 @@ async fn get_schema(
     Query(q): Query<SchemaQuery>,
 ) -> ApiResult<Json<Value>> {
     let refresh = q.refresh.is_some_and(|v| v != "0" && v != "false");
+    if let Db::Redis(r) = st.db(&id).await? {
+        // Redis has no schema: the UI gets the server overview instead.
+        let reason = st.read_only_reason(&id).await?;
+        return Ok(Json(json!({
+            "dialect": "redis",
+            "schemas": [],
+            "defaultSchema": "",
+            "tables": [],
+            "redis": r.overview().await?,
+            "readOnly": reason.is_some(),
+            "readOnlyReason": reason,
+            "canGrantWrite": false,
+        })));
+    }
     let s = st.schema(&id, refresh).await?;
     let reason = st.read_only_reason(&id).await?;
     let mut v = serde_json::to_value(&*s)?;
@@ -390,6 +415,9 @@ async fn ddl_catalog(State(st): State<Shared>, Path(id): Path<String>) -> ApiRes
     let db = st.db(&id).await?;
     let mut v = serde_json::to_value(ddl::catalog(&db).await?)?;
     v["readOnlyReason"] = json!(st.read_only_reason(&id).await?);
+    if db.dialect() == db::Dialect::Bigquery && v["readOnlyReason"].is_null() {
+        v["readOnlyReason"] = json!("BigQuery: change the schema with DDL in the SQL console");
+    }
     Ok(Json(v))
 }
 
@@ -427,6 +455,71 @@ async fn ddl_apply(State(st): State<Shared>, Path(id): Path<String>, Json(req): 
     ddl::execute(&db, &req.statements).await?;
     st.schemas.write().await.remove(&id);
     Ok(Json(json!({ "ok": true, "durationMs": started.elapsed().as_secs_f64() * 1000.0 })))
+}
+
+// ---------- Redis ----------
+
+async fn redis_overview(State(st): State<Shared>, Path(id): Path<String>) -> ApiResult<Json<Value>> {
+    Ok(Json(st.redis(&id).await?.overview().await?))
+}
+
+async fn redis_scan(State(st): State<Shared>, Path(id): Path<String>, Json(req): Json<kv::ScanRequest>) -> ApiResult<Json<Value>> {
+    Ok(Json(st.redis(&id).await?.scan(&req).await?))
+}
+
+async fn redis_key(State(st): State<Shared>, Path(id): Path<String>, Json(req): Json<kv::KeyRequest>) -> ApiResult<Json<Value>> {
+    Ok(Json(st.redis(&id).await?.key(&req).await?))
+}
+
+async fn redis_edit(State(st): State<Shared>, Path(id): Path<String>, Json(req): Json<kv::EditRequest>) -> ApiResult<Json<Value>> {
+    if let Some(reason) = st.read_only_reason(&id).await? {
+        return Err(ApiError(StatusCode::FORBIDDEN, reason));
+    }
+    Ok(Json(st.redis(&id).await?.edit(&req).await?))
+}
+
+async fn redis_command(State(st): State<Shared>, Path(id): Path<String>, Json(req): Json<kv::CommandRequest>) -> ApiResult<Json<Value>> {
+    let read_only = st.is_read_only(&id).await?;
+    let r = st.redis(&id).await?;
+    let started = Instant::now();
+    let reply = r.command(req.db, &req.command, read_only).await?;
+    Ok(Json(json!({ "reply": reply, "durationMs": started.elapsed().as_secs_f64() * 1000.0 })))
+}
+
+// ---------- updates ----------
+
+#[derive(Deserialize)]
+struct CheckQuery {
+    #[serde(default)]
+    force: Option<String>,
+}
+
+async fn update_check(State(st): State<Shared>, Query(q): Query<CheckQuery>) -> ApiResult<Json<Value>> {
+    let force = q.force.is_some_and(|v| v != "0" && v != "false");
+    Ok(Json(st.updater.check(force).await?))
+}
+
+async fn update_download(State(st): State<Shared>) -> ApiResult<Json<Value>> {
+    st.updater.download().await?;
+    Ok(Json(json!(st.updater.progress().await)))
+}
+
+async fn update_progress(State(st): State<Shared>) -> Json<Value> {
+    Json(json!(st.updater.progress().await))
+}
+
+/// Desktop: hands over to the updater and exits; the new version starts by itself.
+async fn update_restart(State(st): State<Shared>) -> ApiResult<Json<Value>> {
+    if st.app_token.is_none() {
+        return Err(not_found("Endpoint"));
+    }
+    st.updater.restart().await?;
+    tracing::info!("exiting for the update");
+    tokio::spawn(async {
+        tokio::time::sleep(std::time::Duration::from_millis(400)).await;
+        std::process::exit(0);
+    });
+    Ok(Json(json!({ "ok": true })))
 }
 
 // ---------- desktop: native file dialogs ----------
@@ -566,6 +659,7 @@ pub fn router(opts: &Options) -> (Router, PathBuf) {
         read_only: opts.read_only,
         auth,
         app_token: opts.app_token.clone(),
+        updater: update::Updater::new(opts.app_token.is_some(), opts.data_dir.clone()),
     });
 
     let api = Router::new()
@@ -584,12 +678,22 @@ pub fn router(opts: &Options) -> (Router, PathBuf) {
         .route("/connections/{id}/ddl/view", get(ddl_view))
         .route("/connections/{id}/ddl/role", get(ddl_role))
         .route("/connections/{id}/ddl/dump", get(ddl_dump))
+        .route("/connections/{id}/redis/overview", get(redis_overview))
+        .route("/connections/{id}/redis/scan", post(redis_scan))
+        .route("/connections/{id}/redis/key", post(redis_key))
+        .route("/connections/{id}/redis/edit", post(redis_edit))
+        .route("/connections/{id}/redis/command", post(redis_command))
+        .route("/update/check", get(update_check))
+        .route("/update/download", post(update_download))
+        .route("/update/progress", get(update_progress))
+        .route("/update/restart", post(update_restart))
         .route("/desktop/save", post(desktop_save))
         .route("/desktop/reveal", post(desktop_reveal));
 
     let app = Router::new()
         .route("/", asset!("index.html", "text/html; charset=utf-8"))
         .route("/app.js", asset!("app.js", "text/javascript; charset=utf-8"))
+        .route("/redis.js", asset!("redis.js", "text/javascript; charset=utf-8"))
         .route("/style.css", asset!("style.css", "text/css; charset=utf-8"))
         .route("/vendor/codemirror.js", asset!("vendor/codemirror.js", "text/javascript; charset=utf-8"))
         .route("/favicon.svg", asset!("favicon.svg", "image/svg+xml"))

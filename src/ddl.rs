@@ -39,6 +39,13 @@ fn q(d: Dialect, text: impl Into<String>, params: &[&str]) -> Sql {
     sql
 }
 
+fn bq(db: &Db) -> Result<&crate::bigquery::Bq> {
+    match db {
+        Db::Bq(b) => Ok(b),
+        _ => bail!("Not a BigQuery connection"),
+    }
+}
+
 // ---------------------------------------------------------------- types
 
 #[derive(Serialize)]
@@ -209,6 +216,8 @@ pub async fn catalog(db: &Db) -> Result<Catalog> {
         Dialect::Postgres => pg_catalog(db).await,
         Dialect::Mysql => my_catalog(db).await,
         Dialect::Sqlite => lite_catalog(db).await,
+        Dialect::Bigquery => bq(db)?.catalog().await,
+        Dialect::Redis => bail!(crate::db::NOT_SQL),
     }
 }
 
@@ -450,6 +459,8 @@ pub async fn table(db: &Db, schema: &str, name: &str) -> Result<TableDetail> {
         Dialect::Postgres => pg_table(db, schema, name, true).await,
         Dialect::Mysql => my_table(db, schema, name).await,
         Dialect::Sqlite => lite_table(db, name).await,
+        Dialect::Bigquery => bq(db)?.table_detail(schema, name).await,
+        Dialect::Redis => bail!(crate::db::NOT_SQL),
     }
 }
 
@@ -906,6 +917,8 @@ pub async fn view(db: &Db, schema: &str, name: &str) -> Result<ViewDetail> {
             let definition = up.find(" AS").map(|i| create[i + 3..].trim().to_string()).unwrap_or_else(|| create.clone());
             Ok(ViewDetail { schema: "main".into(), name: name.into(), materialized: false, definition, ddl: format!("{create};\n") })
         }
+        Dialect::Bigquery => bq(db)?.view_detail(schema, name).await,
+        Dialect::Redis => bail!(crate::db::NOT_SQL),
     }
 }
 
@@ -974,6 +987,9 @@ pub async fn role(db: &Db, name: &str) -> Result<RoleDetail> {
 
 /// DDL for the whole database (all user schemas).
 pub async fn dump(db: &Db) -> Result<String> {
+    if let Db::Bq(b) = db {
+        return b.dump().await;
+    }
     let cat = catalog(db).await?;
     let d = cat.dialect;
     let mut out = String::new();
@@ -1051,6 +1067,7 @@ pub async fn dump(db: &Db) -> Result<String> {
                 out.push_str(&format!("{};\n\n", s(&r[0])));
             }
         }
+        Dialect::Bigquery | Dialect::Redis => bail!("Not supported"),
     }
     Ok(out.trim_end().to_string() + "\n")
 }
@@ -1083,6 +1100,8 @@ pub async fn execute(db: &Db, statements: &[String]) -> Result<()> {
                 sqlx::raw_sql(st).execute(p).await.map_err(|e| fail(i, e))?;
             }
         }
+        Db::Bq(b) => b.execute_ddl(&stmts.iter().map(|x| x.to_string()).collect::<Vec<_>>()).await?,
+        Db::Redis(_) => bail!(crate::db::NOT_SQL),
     }
     Ok(())
 }

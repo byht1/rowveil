@@ -1,0 +1,32 @@
+FLUSHALL
+SET app:name "Rowveil testbed"
+SET app:version "0.4.0"
+SET app:config "{\"theme\":\"rowveil\",\"features\":{\"redis\":true,\"bigquery\":true},\"limits\":[50,100,500],\"owner\":null}"
+SET app:motd "Welcome!\nThis value has\nseveral lines."
+SET counter:visits 1024
+SET binary:blob "\x00\x01\x02\xffPNG\r\n"
+SET cache:homepage "<html><body>cached page</body></html>" EX 3600
+SET session:short "expires soon" EX 120
+HSET user:1 name "Ada Lovelace" email "ada@example.com" role admin plan pro created_at "2024-01-15T10:00:00Z"
+HSET user:2 name "Alan Turing" email "alan@example.com" role editor plan free created_at "2024-02-01T08:30:00Z"
+HSET user:3 name "Grace Hopper" email "grace@example.com" role viewer plan team prefs "{\"lang\":\"en\",\"tz\":\"UTC\"}"
+RPUSH queue:emails "welcome:ada@example.com" "reset:alan@example.com" "digest:grace@example.com" "welcome:linus@example.com"
+RPUSH log:recent "GET /" "GET /pricing" "POST /signup" "GET /dashboard" "GET /settings"
+SADD tags:post:1 rust database explorer sql
+SADD tags:post:2 redis cache "key value"
+SADD online:users 1 2 3
+ZADD leaderboard 1520 ada 1490 alan 1610 grace 1200 linus 990 margaret 1730 edsger
+ZADD trending:hourly 42 "rowveil" 17 "redis" 31 "bigquery" 8 "sqlite"
+XADD events:orders * type created order_id 1001 amount 49.90
+XADD events:orders * type paid order_id 1001 method card
+XADD events:orders * type shipped order_id 1001 carrier ups
+XADD events:orders * type created order_id 1002 amount 12.50
+XGROUP CREATE events:orders billing 0
+JSON.SET product:1 $ "{\"id\":1,\"name\":\"Mechanical keyboard\",\"price\":129.0,\"tags\":[\"hardware\",\"input\"],\"stock\":{\"warehouse\":\"WAW\",\"qty\":42}}"
+JSON.SET product:2 $ "{\"id\":2,\"name\":\"USB-C cable\",\"price\":9.5,\"tags\":[\"cable\"],\"stock\":{\"warehouse\":\"BER\",\"qty\":800}}"
+PFADD visitors:today a b c d e f
+EVAL "for i=1,300 do redis.call('SET', string.format('session:%04d', i), 'token-' .. i, 'EX', 86400 + i) end for i=1,120 do redis.call('HSET', 'order:' .. (1000 + i), 'status', (i % 3 == 0) and 'paid' or 'new', 'total', i * 3.5) end return 'ok'" 0
+SELECT 1
+SET other:db "Keys in database 1"
+HSET other:settings mode staging debug true
+SELECT 0

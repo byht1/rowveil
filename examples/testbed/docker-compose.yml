@@ -1,13 +1,17 @@
-# Rowveil testbed: PostgreSQL + MySQL + SQLite with data for every Rowveil feature.
+# Rowveil testbed: PostgreSQL + MySQL + SQLite + Redis + BigQuery (emulator) with data for every Rowveil feature.
 #
 #   docker compose -f examples/testbed/docker-compose.yml up -d --build
 #   open http://localhost:4984
 #
 # Only the databases (use them from a locally running Rowveil):
-#   docker compose -f examples/testbed/docker-compose.yml up -d postgres mysql
+#   docker compose -f examples/testbed/docker-compose.yml up -d postgres mysql redis redis-seed bigquery
 #   postgres://postgres:postgres@localhost:54329/testbed
 #   mysql://root:root@localhost:13306/testbed
 #   sqlite://examples/testbed/testbed.db
+#   redis://localhost:16379/0
+#   bigquery://testbed?endpoint=http://localhost:19050
+#
+# Re-seed Redis:  docker compose -f examples/testbed/docker-compose.yml run --rm redis-seed
 #
 # Start from scratch (re-run the seed scripts):
 #   docker compose -f examples/testbed/docker-compose.yml down -v
@@ -45,6 +49,36 @@ services:
       interval: 3s
       retries: 60
 
+  redis:
+    # Redis Stack: Redis with the JSON module.
+    image: redis/redis-stack-server:latest
+    ports:
+      - "16379:6379"
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 2s
+      retries: 30
+
+  redis-seed:
+    image: redis/redis-stack-server:latest
+    entrypoint: ["sh", "-c", "redis-cli -h redis < /seed/redis.txt > /dev/null && echo 'Redis seeded'"]
+    volumes:
+      - ./redis.txt:/seed/redis.txt:ro
+    depends_on:
+      redis:
+        condition: service_healthy
+    restart: "no"
+
+  bigquery:
+    # BigQuery emulator: the REST API on port 9050, no credentials.
+    image: ghcr.io/goccy/bigquery-emulator:latest
+    platform: linux/amd64
+    command: ["--project=testbed", "--data-from-yaml=/data/bigquery.yaml"]
+    ports:
+      - "19050:9050"
+    volumes:
+      - ./bigquery.yaml:/data/bigquery.yaml:ro
+
   rowveil:
     build: ../..
     image: rowveil:latest
@@ -55,6 +89,8 @@ services:
       DATABASE_URL_MYSQL: mysql://root:root@mysql:3306/testbed
       DATABASE_URL_SQLITE: sqlite:///db/testbed.db
       DATABASE_URL_PG_READER: postgres://app_reader:reader@postgres:5432/testbed
+      DATABASE_URL_REDIS: redis://redis:6379/0
+      DATABASE_URL_BIGQUERY: bigquery://testbed?endpoint=http://bigquery:9050
     volumes:
       - ./:/db            # the folder, so SQLite can create its journal next to the file
       - rowveil-data:/data
@@ -63,6 +99,10 @@ services:
         condition: service_healthy
       mysql:
         condition: service_healthy
+      redis:
+        condition: service_healthy
+      bigquery:
+        condition: service_started
 
 volumes:
   pg-data:

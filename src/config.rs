@@ -60,6 +60,18 @@ pub fn mask_url(url: &str) -> String {
 
 /// Derive a readable name from a connection URL.
 pub fn name_from_url(url: &str) -> String {
+    let lower = url.to_ascii_lowercase();
+    if crate::kv::is_redis_url(&lower) || crate::bigquery::is_bigquery_url(&lower) {
+        // redis://user:pass@host:6379/0 -> "host"; bigquery://project/dataset -> "project"
+        let rest = url.split_once("://").map(|x| x.1).unwrap_or(url);
+        let rest = rest.rsplit_once('@').map(|x| x.1).unwrap_or(rest);
+        let host = rest.split(['/', '?']).next().unwrap_or("");
+        let host = match host.strip_prefix('[') {
+            Some(v6) => v6.split(']').next().unwrap_or(""),
+            None => host.split(':').next().unwrap_or(""),
+        };
+        return if host.is_empty() { "database".into() } else { host.to_string() };
+    }
     let base = url.split('?').next().unwrap_or(url);
     let tail = base.rsplit(['/', '\\']).next().unwrap_or("database");
     if tail.is_empty() || tail.contains('@') || tail.contains(':') {
@@ -137,5 +149,8 @@ mod tests {
     fn names_from_url() {
         assert_eq!(name_from_url("postgres://u:p@h/shop?ssl=true"), "shop");
         assert_eq!(name_from_url("sqlite://C:\\data\\app.db"), "app.db");
+        assert_eq!(name_from_url("redis://:p%40ss@cache.local:6379/2"), "cache.local");
+        assert_eq!(name_from_url("rediss://[::1]:6380"), "::1");
+        assert_eq!(name_from_url("bigquery://my-proj/sales?location=EU"), "my-proj");
     }
 }

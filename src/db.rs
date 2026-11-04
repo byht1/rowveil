@@ -8,6 +8,7 @@ use sqlx::mysql::{MySqlPool, MySqlPoolOptions, MySqlRow};
 use sqlx::postgres::{PgPool, PgPoolOptions, PgRow};
 use sqlx::sqlite::{SqliteConnectOptions, SqlitePool, SqlitePoolOptions, SqliteRow};
 use sqlx::{Column, Either, Row, TypeInfo, ValueRef};
+use std::sync::Arc;
 use std::time::Duration;
 
 #[derive(Clone, Copy, Debug, Serialize, PartialEq, Eq)]
@@ -16,6 +17,15 @@ pub enum Dialect {
     Postgres,
     Mysql,
     Sqlite,
+    Bigquery,
+    Redis,
+}
+
+impl Dialect {
+    /// SQL databases (Redis has its own API and UI).
+    pub fn is_sql(self) -> bool {
+        self != Dialect::Redis
+    }
 }
 
 #[derive(Clone)]
@@ -24,7 +34,12 @@ pub enum Db {
     My(MySqlPool),
     /// SQLite pool and whether the file is opened read-only.
     Lite(SqlitePool, bool),
+    Bq(Arc<crate::bigquery::Bq>),
+    Redis(Arc<crate::kv::Redis>),
 }
+
+/// Error for SQL operations on a Redis connection.
+pub const NOT_SQL: &str = "Redis is not a SQL database";
 
 /// Max rows that the SQL console returns per result set.
 pub const CONSOLE_ROW_LIMIT: usize = 5000;
@@ -45,6 +60,12 @@ pub fn normalize_url(raw: &str) -> Result<(Dialect, String)> {
     if lower.starts_with("sqlite:") {
         return Ok((Dialect::Sqlite, url.to_string()));
     }
+    if crate::kv::is_redis_url(&lower) {
+        return Ok((Dialect::Redis, url.to_string()));
+    }
+    if crate::bigquery::is_bigquery_url(&lower) {
+        return Ok((Dialect::Bigquery, url.to_string()));
+    }
     if lower.starts_with("file:") {
         return Ok((Dialect::Sqlite, format!("sqlite://{}", &url["file:".len()..])));
     }
@@ -52,7 +73,7 @@ pub fn normalize_url(raw: &str) -> Result<(Dialect, String)> {
     if is_file_like || std::path::Path::new(url).is_file() {
         return Ok((Dialect::Sqlite, format!("sqlite://{url}")));
     }
-    bail!("Unsupported connection URL. Use postgres://, mysql://, mariadb:// or sqlite:// (or a path to a .db file)")
+    bail!("Unsupported connection URL. Use postgres://, mysql://, mariadb://, sqlite:// (or a path to a .db file), redis://, rediss:// or bigquery://")
 }
 
 fn percent_decode(s: &str) -> String {
@@ -126,6 +147,8 @@ pub async fn connect(raw_url: &str) -> Result<Db> {
                 .await
                 .context("MySQL connection failed")?,
         ),
+        Dialect::Bigquery => Db::Bq(Arc::new(crate::bigquery::Bq::connect(&url).await?)),
+        Dialect::Redis => Db::Redis(Arc::new(crate::kv::Redis::connect(&url).await?)),
         Dialect::Sqlite => {
             let (path, read_only) = sqlite_target(&url);
             let memory = path.as_os_str() == ":memory:";
@@ -162,6 +185,7 @@ pub async fn connect(raw_url: &str) -> Result<Db> {
 pub fn quote_ident(d: Dialect, s: &str) -> String {
     match d {
         Dialect::Mysql => format!("`{}`", s.replace('`', "``")),
+        Dialect::Bigquery => crate::bigquery::qi(s),
         _ => format!("\"{}\"", s.replace('"', "\"\"")),
     }
 }
@@ -228,6 +252,9 @@ pub struct ResultSet {
     pub rows: Vec<Vec<Value>>,
     pub rows_affected: u64,
     pub truncated: bool,
+    /// Extra line for the result header (BigQuery: bytes processed / billed).
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub info: Option<String>,
 }
 
 fn bytes_to_value(b: Vec<u8>) -> Value {
@@ -353,6 +380,8 @@ pub fn kind_from_type_name(d: Dialect, name: &str) -> String {
             _ => "text",
         },
         Dialect::Sqlite => return sqlite_kind(&n),
+        Dialect::Bigquery => return crate::bigquery::field_kind(&serde_json::json!({ "type": name.to_ascii_uppercase() })),
+        Dialect::Redis => "text",
     };
     k.into()
 }
@@ -384,6 +413,8 @@ impl Db {
             Db::Pg(_) => Dialect::Postgres,
             Db::My(_) => Dialect::Mysql,
             Db::Lite(..) => Dialect::Sqlite,
+            Db::Bq(_) => Dialect::Bigquery,
+            Db::Redis(_) => Dialect::Redis,
         }
     }
 
@@ -397,6 +428,7 @@ impl Db {
             Db::Pg(p) => p.close().await,
             Db::My(p) => p.close().await,
             Db::Lite(p, _) => p.close().await,
+            Db::Bq(_) | Db::Redis(_) => {}
         }
     }
 
@@ -422,6 +454,8 @@ impl Db {
                 .iter()
                 .map(|r| (0..r.len()).map(|i| lite_cell(r, i)).collect())
                 .collect(),
+            Db::Bq(b) => b.fetch(sql).await?,
+            Db::Redis(_) => bail!(NOT_SQL),
         };
         Ok(rows)
     }
@@ -464,6 +498,8 @@ impl Db {
             Db::Pg(p) => run_tx!(p),
             Db::My(p) => run_tx!(p),
             Db::Lite(p, _) => run_tx!(p),
+            Db::Bq(b) => total = b.execute_all(stmts).await?,
+            Db::Redis(_) => bail!(NOT_SQL),
         }
         Ok(total)
     }
@@ -487,6 +523,7 @@ impl Db {
                                 rows: std::mem::take(&mut rows),
                                 rows_affected: res.rows_affected(),
                                 truncated,
+                                info: None,
                             });
                             truncated = false;
                         }
@@ -533,6 +570,7 @@ impl Db {
                         rows,
                         rows_affected: 0,
                         truncated,
+                        info: None,
                     });
                 }
                 sets
@@ -542,6 +580,8 @@ impl Db {
             Db::Pg(p) => collect!(p, pg_cell),
             Db::My(p) => collect!(p, my_cell),
             Db::Lite(p, _) => collect!(p, lite_cell),
+            Db::Bq(b) => b.run_console(sql).await?,
+            Db::Redis(_) => bail!(NOT_SQL),
         };
         Ok(sets)
     }

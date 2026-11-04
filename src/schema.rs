@@ -98,6 +98,11 @@ pub async fn introspect(db: &Db) -> Result<DbSchema> {
         Dialect::Postgres => introspect_pg(db).await?,
         Dialect::Mysql => introspect_mysql(db).await?,
         Dialect::Sqlite => introspect_sqlite(db).await?,
+        Dialect::Bigquery => match db {
+            Db::Bq(bq) => bq.introspect().await?,
+            _ => unreachable!(),
+        },
+        Dialect::Redis => anyhow::bail!(crate::db::NOT_SQL),
     };
     // Attach single-column foreign keys to their columns.
     for t in &mut schema.tables {

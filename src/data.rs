@@ -96,17 +96,20 @@ fn typed_param(q: &mut Sql, col: &Column, v: Option<String>) -> String {
     let p = q.param(v);
     match q.dialect {
         Dialect::Postgres => format!("CAST({p}::text AS {})", col.cast_type),
+        Dialect::Bigquery if col.kind != "json" => format!("CAST({p} AS {})", col.cast_type),
         _ => p,
     }
 }
 
 /// Column expression as text (used for LIKE filters and text comparison).
-fn text_expr(d: Dialect, col: &str) -> String {
-    let q = quote_ident(d, col);
+fn text_expr(d: Dialect, col: &Column) -> String {
+    let q = quote_ident(d, &col.name);
     match d {
         Dialect::Postgres => format!("{q}::text"),
         Dialect::Mysql => format!("CAST({q} AS CHAR)"),
-        Dialect::Sqlite => format!("CAST({q} AS TEXT)"),
+        Dialect::Sqlite | Dialect::Redis => format!("CAST({q} AS TEXT)"),
+        Dialect::Bigquery if col.kind == "json" => format!("TO_JSON_STRING({q})"),
+        Dialect::Bigquery => format!("CAST({q} AS STRING)"),
     }
 }
 
@@ -125,8 +128,8 @@ fn build_where(q: &mut Sql, t: &Table, filters: &[Filter]) -> Result<()> {
     for f in filters {
         let col = find_col(t, &f.column)?;
         let ident = quote_ident(d, &col.name);
-        // PostgreSQL compares json/array/binary columns as text.
-        let typed_compare = d != Dialect::Postgres
+        // PostgreSQL and BigQuery compare json/array/binary columns as text.
+        let typed_compare = !matches!(d, Dialect::Postgres | Dialect::Bigquery)
             || matches!(col.kind.as_str(), "number" | "bigint" | "boolean" | "date" | "uuid" | "enum" | "text");
         let op = f.op.to_ascii_lowercase();
         let part = match op.as_str() {
@@ -138,7 +141,7 @@ fn build_where(q: &mut Sql, t: &Table, filters: &[Filter]) -> Result<()> {
                     format!("{ident} {op} {p}")
                 } else {
                     let p = q.param(v);
-                    format!("{} {op} {p}", text_expr(d, &col.name))
+                    format!("{} {op} {p}", text_expr(d, col))
                 }
             }
             "like" | "not like" | "ilike" | "not ilike" => {
@@ -147,9 +150,9 @@ fn build_where(q: &mut Sql, t: &Table, filters: &[Filter]) -> Result<()> {
                 let ci = op.ends_with("ilike");
                 let p = q.param(Some(v));
                 match (d, ci) {
-                    (Dialect::Postgres, true) => format!("{} {neg}ILIKE {p}", text_expr(d, &col.name)),
-                    (_, true) => format!("LOWER({}) {neg}LIKE LOWER({p})", text_expr(d, &col.name)),
-                    (_, false) => format!("{} {neg}LIKE {p}", text_expr(d, &col.name)),
+                    (Dialect::Postgres, true) => format!("{} {neg}ILIKE {p}", text_expr(d, col)),
+                    (_, true) => format!("LOWER({}) {neg}LIKE LOWER({p})", text_expr(d, col)),
+                    (_, false) => format!("{} {neg}LIKE {p}", text_expr(d, col)),
                 }
             }
             "is null" => format!("{ident} IS NULL"),
@@ -163,7 +166,7 @@ fn build_where(q: &mut Sql, t: &Table, filters: &[Filter]) -> Result<()> {
                         .into_iter()
                         .map(|v| if typed_compare { typed_param(q, col, Some(v)) } else { q.param(Some(v)) })
                         .collect();
-                    let lhs = if typed_compare { ident.clone() } else { text_expr(d, &col.name) };
+                    let lhs = if typed_compare { ident.clone() } else { text_expr(d, col) };
                     let neg = if op == "not in" { "NOT " } else { "" };
                     format!("{lhs} {neg}IN ({})", ps.join(", "))
                 }
@@ -189,7 +192,7 @@ fn select_expr(d: Dialect, c: &Column) -> String {
     match d {
         Dialect::Postgres => format!("{full}::text AS {q}"),
         Dialect::Mysql => format!("CAST({full} AS CHAR) AS {q}"),
-        Dialect::Sqlite => format!("{full} AS {q}"),
+        Dialect::Sqlite | Dialect::Bigquery | Dialect::Redis => format!("{full} AS {q}"),
     }
 }
 
@@ -198,6 +201,18 @@ pub async fn fetch_rows(db: &Db, t: &Table, req: &RowsRequest) -> Result<RowsRes
     let from = table_ref(d, &t.schema, &t.name);
     let limit = req.limit.clamp(1, 10_000);
     let offset = req.offset.max(0);
+
+    // BigQuery: plain browsing reads table data directly (no query job, no cost).
+    if let Db::Bq(bq) = db {
+        if req.filters.is_empty() && req.sort.is_empty() && t.kind == "table" {
+            let (raw, total) = bq.browse(&t.schema, &t.name, offset, limit).await?;
+            let rows = raw
+                .into_iter()
+                .map(|r| r.into_iter().zip(&t.columns).map(|(v, c)| typed_value(&c.kind, v)).collect())
+                .collect();
+            return Ok(RowsResponse { columns: t.columns.iter().map(|c| c.name.clone()).collect(), rows, total });
+        }
+    }
 
     let mut q = Sql::new(d);
     let cols: Vec<String> = t.columns.iter().map(|c| select_expr(d, c)).collect();
@@ -233,7 +248,7 @@ pub async fn fetch_rows(db: &Db, t: &Table, req: &RowsRequest) -> Result<RowsRes
         let count_expr = match d {
             Dialect::Postgres => "COUNT(*)::text",
             Dialect::Mysql => "CAST(COUNT(*) AS CHAR)",
-            Dialect::Sqlite => "COUNT(*)",
+            Dialect::Sqlite | Dialect::Bigquery | Dialect::Redis => "COUNT(*)",
         };
         cq.push(&format!("SELECT {count_expr} FROM {from}"));
         build_where(&mut cq, t, &req.filters)?;

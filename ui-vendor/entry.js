@@ -17,5 +17,5 @@ export {
 export { searchKeymap, highlightSelectionMatches, selectNextOccurrence, selectSelectionMatches, openSearchPanel, searchPanelOpen, closeSearchPanel } from '@codemirror/search';
 export { sql, PostgreSQL, MySQL, SQLite, StandardSQL } from '@codemirror/lang-sql';
 export { tags } from '@lezer/highlight';
-export { formatDialect, postgresql, mysql, mariadb, sqlite, sql as standardSql } from 'sql-formatter';
+export { formatDialect, postgresql, mysql, mariadb, sqlite, bigquery, sql as standardSql } from 'sql-formatter';
 export { json } from '@codemirror/lang-json';

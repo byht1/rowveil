@@ -1,4 +1,5 @@
 import * as CM from '/vendor/codemirror.js';
+import { createRedisUI } from '/redis.js';
 
 // Rowveil — single-page UI (no build step).
 
@@ -171,7 +172,11 @@ const isReadOnly = () => !!(state.schema && state.schema.readOnly);
 const findTable = (schema, name) => state.schema?.tables.find((t) => t.schema === schema && t.name === name);
 const activeTab = () => state.tabs.find((t) => t.id === state.activeTab);
 
-const DIALECT_LABEL = { postgres: 'PostgreSQL', mysql: 'MySQL', sqlite: 'SQLite' };
+const DIALECT_LABEL = { postgres: 'PostgreSQL', mysql: 'MySQL', sqlite: 'SQLite', bigquery: 'BigQuery', redis: 'Redis' };
+const isRedis = () => state.schema?.dialect === 'redis';
+// Dialects that quote identifiers with backticks and allow "double-quoted" strings and # comments.
+const backtickSql = () => ['mysql', 'bigquery'].includes(state.schema?.dialect);
+const schemaWord = (d) => ({ mysql: 'Database', bigquery: 'Dataset' }[d] || 'Schema');
 
 // ---------------------------------------------------------------- persistence of tabs
 function saveTabs() {
@@ -179,6 +184,7 @@ function saveTabs() {
   const tabs = state.tabs.map((t) => {
     if (t.type === 'sql') return { type: 'sql', title: t.title, sql: t.sql };
     if (t.type === 'schema') return { type: 'schema', section: t.section, sel: t.sel, schemaFilter: t.schemaFilter };
+    if (t.type === 'rkey' || t.type === 'rcli') return R.saveTab(t);
     return { type: 'table', schema: t.schema, table: t.table, filters: t.filters, sort: t.sort, pageSize: t.pageSize, hidden: t.hidden, widths: t.widths, view: t.view };
   });
   const activeIdx = state.tabs.findIndex((t) => t.id === state.activeTab);
@@ -194,6 +200,7 @@ function restoreTabs() {
   for (const t of saved.tabs || []) {
     if (t.type === 'sql') state.tabs.push(newSqlTab(t.title, t.sql));
     else if (t.type === 'schema') state.tabs.push(newSchemaTab(t));
+    else if (t.type === 'rkey' || t.type === 'rcli') { if (isRedis()) state.tabs.push(R.restoreTab(t)); }
     else if (findTable(t.schema, t.table)) state.tabs.push(newTableTab(t.schema, t.table, t));
   }
   const active = state.tabs[saved.active] || state.tabs[0];
@@ -249,6 +256,113 @@ async function boot() {
   });
   if (pick) await selectConnection(pick.id);
   else render();
+  setTimeout(() => checkForUpdates({ auto: true }), 3000);
+  setInterval(() => checkForUpdates({ auto: true }), 6 * 3600 * 1000);
+}
+
+// ---------------------------------------------------------------- updates
+const updateAvailable = () => !!(state.update?.available && state.update.latest !== store.get('rs.skipVersion', null));
+
+async function checkForUpdates({ auto = false, force = false } = {}) {
+  if (auto && !store.get('rs.autoUpdate', true)) return state.update;
+  try {
+    state.update = await api(`/update/check${force ? '?force=1' : ''}`);
+  } catch (e) {
+    if (!auto) throw e;
+    return null;
+  }
+  renderSidebar();
+  if (auto && updateAvailable() && store.get('rs.updateToasted', null) !== state.update.latest) {
+    store.set('rs.updateToasted', state.update.latest);
+    toast(`Rowveil ${state.update.latest} is available`, 'info', { label: 'Details', run: () => openUpdateModal() });
+  }
+  return state.update;
+}
+
+function openUpdateModal() {
+  const body = h('div', { class: 'form update-modal' });
+  const foot = h('div', { class: 'update-foot' });
+  let timer = null;
+  const close = openModal('Updates', body, foot, { wide: true, onClose: () => clearInterval(timer) });
+  const auto = h('input', { type: 'checkbox', checked: store.get('rs.autoUpdate', true), onchange: (e) => store.set('rs.autoUpdate', e.target.checked) });
+
+  const fmtMb = (n) => `${(n / 1048576).toFixed(1)} MB`;
+  const draw = (u, progress = null, error = null) => {
+    body.replaceChildren();
+    foot.replaceChildren();
+    const cur = state.info?.version;
+    if (!u) {
+      body.append(h('p', { class: error ? 'error-text' : 'muted' }, error || 'Checking for updates…'));
+    } else if (!u.available) {
+      body.append(h('div', { class: 'update-head' }, icon('check', 18), h('div', {}, h('b', {}, 'Rowveil is up to date'), h('div', { class: 'muted small' }, `Version ${cur}. Latest release: ${u.latest}.`))));
+    } else {
+      body.append(h('div', { class: 'update-head' }, icon('download', 18),
+        h('div', {}, h('b', {}, `Rowveil ${u.latest} is available`), h('div', { class: 'muted small' }, `You have ${cur}.${u.size ? ` Download: ${fmtMb(u.size)}.` : ''}`))));
+      if (u.release?.notes) body.append(h('pre', { class: 'update-notes' }, u.release.notes.trim()));
+      if (progress && progress.phase === 'downloading') {
+        const pct = progress.total ? Math.min(100, Math.round((progress.received / progress.total) * 100)) : 0;
+        body.append(h('div', { class: 'update-progress' }, h('div', { style: { width: `${pct}%` } })),
+          h('div', { class: 'muted small' }, `Downloading… ${fmtMb(progress.received)}${progress.total ? ` of ${fmtMb(progress.total)}` : ''}`));
+      }
+      if (progress?.phase === 'ready') {
+        body.append(h('div', { class: 'form-status ok' }, u.method === 'msi'
+          ? 'Downloaded and verified. Rowveil closes, Windows asks for permission once, installs the update and starts Rowveil again.'
+          : 'Downloaded and verified. Rowveil restarts with the new version.'));
+      }
+      if (progress?.phase === 'restarting') body.append(h('div', { class: 'form-status' }, h('span', { class: 'spinner' }), ' Restarting…'));
+      if (progress?.phase === 'error' || error) body.append(h('div', { class: 'form-status error' }, error || progress.error));
+      if (u.method === 'none') {
+        body.append(h('div', { class: 'hint' }, 'This is the web server. Update it like any other server: pull the new Docker image (', h('code', {}, 'docker compose pull && docker compose up -d'), ') or download the new binary.'));
+      } else if (!u.canInstall) {
+        body.append(h('div', { class: 'hint' }, 'This install cannot update itself (for example, a system package). Download the new version from the release page.'));
+      }
+    }
+    body.append(h('label', { class: 'check' }, auto, 'Check for updates automatically'));
+
+    const btns = [];
+    if (u?.available) {
+      btns.push(h('a', { class: 'btn ghost', href: u.release.url, target: '_blank', rel: 'noopener' }, icon('external', 13), 'Release page'));
+      btns.push(h('button', { class: 'btn ghost', onclick: () => { store.set('rs.skipVersion', u.latest); close(); renderSidebar(); } }, 'Skip this version'));
+      if (u.canInstall) {
+        const phase = progress?.phase || 'idle';
+        if (phase === 'ready') btns.push(h('button', { class: 'btn primary', onclick: () => restart() }, icon('refresh', 13), 'Restart and update'));
+        else if (phase === 'downloading' || phase === 'restarting') btns.push(h('button', { class: 'btn primary', disabled: true }, h('span', { class: 'spinner' }), phase === 'restarting' ? 'Restarting…' : 'Downloading…'));
+        else btns.push(h('button', { class: 'btn primary', onclick: () => download() }, icon('download', 13), phase === 'error' ? 'Try again' : 'Download and install'));
+      }
+    } else {
+      btns.push(h('button', { class: 'btn', onclick: () => load(true) }, icon('refresh', 13), 'Check now'));
+    }
+    btns.push(h('button', { class: 'btn', onclick: () => close() }, 'Close'));
+    foot.append(...btns);
+  };
+
+  const poll = () => {
+    clearInterval(timer);
+    timer = setInterval(async () => {
+      try {
+        const p = await api('/update/progress');
+        draw(state.update, p);
+        if (p.phase !== 'downloading') clearInterval(timer);
+      } catch { clearInterval(timer); }
+    }, 400);
+  };
+  const download = async () => {
+    try { const p = await api('/update/download', { body: {} }); draw(state.update, p); poll(); } catch (e) { draw(state.update, null, e.message); }
+  };
+  const restart = async () => {
+    draw(state.update, { phase: 'restarting' });
+    try { await api('/update/restart', { body: {} }); } catch (e) { draw(state.update, null, e.message); }
+  };
+  const load = async (force) => {
+    draw(null);
+    try {
+      const u = await checkForUpdates({ force });
+      const p = await api('/update/progress').catch(() => null);
+      draw(u, p && p.version === u.latest ? p : null);
+      if (p?.phase === 'downloading') poll();
+    } catch (e) { draw(null, null, e.message); }
+  };
+  load(false);
 }
 
 function hashConn() {
@@ -276,6 +390,7 @@ async function selectConnection(id, refresh = false) {
     state.schema = await api(`/connections/${id}/schema${refresh ? '?refresh=1' : ''}`);
     state.schemaName = state.schema.defaultSchema;
     if (!state.schema.schemas.includes(state.schemaName)) state.schemaName = state.schema.schemas[0] || '';
+    if (isRedis()) R.onConnect();
     restoreTabs();
   } catch (e) {
     state.schemaError = e.message;
@@ -354,6 +469,12 @@ function renderSidebar() {
     return;
   }
 
+  if (isRedis()) {
+    R.renderSidebar(sb);
+    sb.append(sidebarFooter());
+    return;
+  }
+
   const schemas = state.schema.schemas;
   if (schemas.length > 1) {
     const sel = h('select', {
@@ -361,7 +482,7 @@ function renderSidebar() {
       value: state.schemaName,
       onchange: (e) => { state.schemaName = e.target.value; saveTabs(); renderSidebar(); },
     }, schemas.map((s) => h('option', { value: s }, s)));
-    sb.append(h('div', { class: 'sb-row' }, h('label', { class: 'sb-label' }, state.schema.dialect === 'mysql' ? 'Database' : 'Schema'), sel));
+    sb.append(h('div', { class: 'sb-row' }, h('label', { class: 'sb-label' }, schemaWord(state.schema.dialect)), sel));
   }
 
   const search = h('input', {
@@ -465,7 +586,9 @@ function openThemeMenu(anchor) {
 function sidebarFooter() {
   const theme = THEMES.find((t) => t.id === document.documentElement.dataset.theme) || THEMES[0];
   return h('div', { class: 'sb-foot' },
-    h('span', { class: 'brand' }, h('img', { class: 'brand-mark', src: '/brand/symbol.svg', alt: '' }), h('span', { class: 'brand-name' }, 'Rowveil'), h('span', { class: 'ver' }, state.info ? `v${state.info.version}` : '')),
+    h('span', { class: 'brand' }, h('img', { class: 'brand-mark', src: '/brand/symbol.svg', alt: '' }), h('span', { class: 'brand-name' }, 'Rowveil'),
+      h('button', { class: 'ver', title: 'Check for updates', onclick: () => openUpdateModal() }, state.info ? `v${state.info.version}` : ''),
+      updateAvailable() ? h('button', { class: 'update-pill', title: `Rowveil ${state.update.latest} is available`, onclick: () => openUpdateModal() }, icon('download', 11), 'Update') : null),
     h('button', { class: 'btn ghost sm', title: 'Theme', onclick: (e) => openThemeMenu(e.currentTarget) },
       icon('palette', 14), h('span', { class: 'theme-name' }, theme.name)),
   );
@@ -568,6 +691,8 @@ const DB_TYPES = [
   { id: 'mysql', label: 'MySQL', port: 3306, user: 'root', sslKey: 'ssl-mode', ssl: { disable: 'disabled', require: 'required' } },
   { id: 'mariadb', label: 'MariaDB', port: 3306, user: 'root', sslKey: 'ssl-mode', ssl: { disable: 'disabled', require: 'required' } },
   { id: 'sqlite', label: 'SQLite' },
+  { id: 'redis', label: 'Redis', port: 6379, user: 'default' },
+  { id: 'bigquery', label: 'BigQuery' },
 ];
 const dbType = (id) => DB_TYPES.find((t) => t.id === id) || DB_TYPES[0];
 
@@ -579,6 +704,18 @@ function safeDecode(s) {
 // so special characters (/ ? # @ : %) in a password do not break the URL.
 function buildConnUrl(f, { maskPassword = false } = {}) {
   const t = dbType(f.type);
+  if (t.id === 'bigquery') {
+    const project = f.project.trim();
+    if (!project) return '';
+    const q = [];
+    const add = (k, v) => { if (String(v).trim()) q.push(`${k}=${encodeURIComponent(String(v).trim())}`); };
+    add('credentials', f.keyFile);
+    add('location', f.location);
+    add('maximumBytesBilled', f.maxBytes);
+    add('endpoint', f.endpoint);
+    const ds = f.dataset.trim();
+    return `bigquery://${encodeURIComponent(project)}${ds ? '/' + encodeURIComponent(ds) : ''}${q.length ? '?' + q.join('&') : ''}`;
+  }
   if (t.id === 'sqlite') {
     const p = f.file.trim().replace(/\\/g, '/').replace(/%/g, '%25').replace(/\?/g, '%3F').replace(/#/g, '%23');
     return p ? `sqlite://${p}` : '';
@@ -586,7 +723,7 @@ function buildConnUrl(f, { maskPassword = false } = {}) {
   const host = f.host.trim();
   if (!host) return '';
   let auth = '';
-  if (f.user) {
+  if (f.user || (t.id === 'redis' && f.password)) {
     auth = encodeURIComponent(f.user);
     if (f.password) auth += ':' + (maskPassword ? '••••' : encodeURIComponent(f.password));
     auth += '@';
@@ -594,17 +731,22 @@ function buildConnUrl(f, { maskPassword = false } = {}) {
   const hostPart = host.includes(':') && !host.startsWith('[') ? `[${host}]` : host;
   const port = String(f.port).trim();
   const params = [];
-  if (f.ssl && f.ssl !== 'default') params.push(`${t.sslKey}=${t.ssl[f.ssl]}`);
+  if (t.sslKey && f.ssl && f.ssl !== 'default') params.push(`${t.sslKey}=${t.ssl[f.ssl]}`);
   const extra = f.options.trim().replace(/^\?/, '');
   if (extra) params.push(extra);
   const query = params.length ? `?${params.join('&')}` : '';
+  if (t.id === 'redis') {
+    const scheme = f.ssl === 'require' ? 'rediss' : 'redis';
+    const db = f.database.trim();
+    return `${scheme}://${auth}${hostPart}${port ? ':' + port : ''}${db ? '/' + encodeURIComponent(db) : ''}${query}`;
+  }
   return `${t.id}://${auth}${hostPart}${port ? ':' + port : ''}/${encodeURIComponent(f.database.trim())}${query}`;
 }
 
 // Splits a connection URL into fields. Tolerates raw (not encoded) passwords: the last "@" ends the credentials.
 function parseConnUrl(raw) {
   const url = raw.trim();
-  const f = { type: 'postgres', host: '', port: '', user: '', password: '', database: '', ssl: 'default', options: '', file: '' };
+  const f = { type: 'postgres', host: '', port: '', user: '', password: '', database: '', ssl: 'default', options: '', file: '', project: '', dataset: '', keyFile: '', location: '', maxBytes: '', endpoint: '' };
   const m = /^([a-z][a-z0-9+.-]*):(?:\/\/)?(.*)$/i.exec(url);
   if (!m) {
     if (url) { f.type = 'sqlite'; f.file = url; }
@@ -617,7 +759,27 @@ function parseConnUrl(raw) {
     f.file = safeDecode(rest.split('?')[0].replace(/^@/, '').replace(/^\/([a-z]:)/i, '$1'));
     return f;
   }
-  f.type = scheme === 'postgresql' ? 'postgres' : (DB_TYPES.some((t) => t.id === scheme) ? scheme : 'postgres');
+  if (scheme === 'bigquery' || scheme === 'bq') {
+    f.type = 'bigquery';
+    const [path, query = ''] = rest.split(/\?(.*)/s);
+    const [project = '', dataset = ''] = path.split('/');
+    f.project = safeDecode(project);
+    f.dataset = safeDecode(dataset);
+    for (const kv of query.split('&').filter(Boolean)) {
+      const [k, v = ''] = kv.split('=');
+      const val = safeDecode(v);
+      const key = k.toLowerCase();
+      if (key === 'credentials' || key === 'keyfile') f.keyFile = val;
+      else if (key === 'location') f.location = val;
+      else if (key === 'maximumbytesbilled') f.maxBytes = val;
+      else if (key === 'endpoint') f.endpoint = val;
+    }
+    return f;
+  }
+  if (['redis', 'rediss', 'valkey', 'valkeys'].includes(scheme)) {
+    f.type = 'redis';
+    if (scheme.endsWith('s')) f.ssl = 'require';
+  } else f.type = scheme === 'postgresql' ? 'postgres' : (DB_TYPES.some((t) => t.id === scheme) ? scheme : 'postgres');
   const t = dbType(f.type);
   const at = rest.lastIndexOf('@');
   if (at >= 0) {
@@ -641,7 +803,7 @@ function parseConnUrl(raw) {
   const opts = [];
   for (const kv of query.split('&').filter(Boolean)) {
     const [k, v = ''] = kv.split('=');
-    if (k.toLowerCase() === t.sslKey) {
+    if (t.sslKey && k.toLowerCase() === t.sslKey) {
       const val = v.toLowerCase();
       if (val === t.ssl.disable) f.ssl = 'disable';
       else if (val === t.ssl.require) f.ssl = 'require';
@@ -667,6 +829,8 @@ function openConnectionModal() {
       h('div', {}, h('code', {}, 'postgres://user:pass@host:5432/db')),
       h('div', {}, h('code', {}, 'mysql://user:pass@host:3306/db'), ' (or ', h('code', {}, 'mariadb://'), ')'),
       h('div', {}, h('code', {}, 'sqlite://./data.db'), ' or a path to a ', h('code', {}, '.db'), ' file'),
+      h('div', {}, h('code', {}, 'redis://:pass@host:6379/0'), ' (TLS: ', h('code', {}, 'rediss://'), ')'),
+      h('div', {}, h('code', {}, 'bigquery://project/dataset?credentials=C:\\key.json'), ' (', h('code', {}, 'location'), ', ', h('code', {}, 'maximumBytesBilled'), ', ', h('code', {}, 'endpoint'), ')'),
       h('div', {}, 'Encode special characters in the password: ', h('code', {}, '/ → %2F'), ' ', h('code', {}, '# → %23'), ' ', h('code', {}, '@ → %40')),
     ),
   );
@@ -685,6 +849,12 @@ function openConnectionModal() {
   );
   const options = h('input', { class: 'input mono', placeholder: 'application_name=studio&connect_timeout=10' });
   const file = h('input', { class: 'input mono', placeholder: 'C:\\data\\app.db  or  ./data.db' });
+  const project = h('input', { class: 'input mono', placeholder: 'my-gcp-project' });
+  const dataset = h('input', { class: 'input mono', placeholder: 'analytics' });
+  const keyFile = h('input', { class: 'input mono', placeholder: 'C:\\keys\\service-account.json' });
+  const location = h('input', { class: 'input mono', placeholder: 'US, EU, europe-west1…' });
+  const maxBytes = h('input', { class: 'input mono', inputmode: 'numeric', placeholder: '10000000000  (10 GB)' });
+  const endpoint = h('input', { class: 'input mono', placeholder: 'http://localhost:9050' });
   const preview = h('div', { class: 'url-preview mono' });
   const eye = h('button', {
     class: 'icon-btn pw-toggle', type: 'button', title: 'Show password', onclick: () => {
@@ -698,6 +868,7 @@ function openConnectionModal() {
   const fields = () => ({
     type, host: host.value, port: port.value, user: user.value, password: password.value,
     database: database.value, ssl: ssl.value, options: options.value, file: file.value,
+    project: project.value, dataset: dataset.value, keyFile: keyFile.value, location: location.value, maxBytes: maxBytes.value, endpoint: endpoint.value,
   });
   const typeSeg = h('div', { class: 'seg seg-full' });
   const serverBox = h('div', { class: 'form' },
@@ -706,14 +877,24 @@ function openConnectionModal() {
       h('label', {}, 'User', user),
       h('label', {}, 'Password', h('div', { class: 'pw-wrap' }, password, eye)),
     ),
-    h('div', { class: 'form-grid two' }, h('label', {}, 'Database', database), h('label', {}, 'SSL', ssl)),
+    h('div', { class: 'form-grid two' }, h('label', { class: 'db-label' }, h('span', {}, 'Database'), database), h('label', { class: 'ssl-label' }, h('span', {}, 'SSL'), ssl)),
     h('label', {}, h('span', {}, 'Extra parameters ', h('span', { class: 'opt' }, '(optional)')), options),
   );
   const sqliteBox = h('div', { class: 'form' },
     h('label', {}, 'Database file', file),
     h('div', { class: 'hint' }, h('div', {}, 'Full path to an existing ', h('code', {}, '.db'), ' / ', h('code', {}, '.sqlite'), ' file on the machine where Rowveil runs.')),
   );
-  const fieldsPane = h('div', { class: 'form' }, h('label', {}, 'Database type', typeSeg), serverBox, sqliteBox, h('label', {}, 'Connection URL', preview));
+  const opt = (text) => h('span', {}, text, ' ', h('span', { class: 'opt' }, '(optional)'));
+  const bigqueryBox = h('div', { class: 'form' },
+    h('div', { class: 'form-grid two' }, h('label', {}, 'Project ID', project), h('label', {}, opt('Default dataset'), dataset)),
+    h('label', {}, opt('Service account key file'), keyFile),
+    h('div', { class: 'hint' },
+      h('div', {}, 'Without a key file Rowveil uses ', h('code', {}, 'GOOGLE_APPLICATION_CREDENTIALS'), ', then ', h('code', {}, 'gcloud auth application-default login'), ', then the metadata server on Google Cloud.'),
+      h('div', {}, 'Browsing a table without filters is free. Filters, sorting and the console run query jobs that BigQuery bills.')),
+    h('div', { class: 'form-grid two' }, h('label', {}, opt('Location'), location), h('label', {}, opt('Max bytes billed per query'), maxBytes)),
+    h('label', {}, opt('API endpoint (emulator)'), endpoint),
+  );
+  const fieldsPane = h('div', { class: 'form' }, h('label', {}, 'Database type', typeSeg), serverBox, sqliteBox, bigqueryBox, h('label', {}, 'Connection URL', preview));
 
   const updatePreview = () => {
     const u = buildConnUrl(fields(), { maskPassword: true });
@@ -725,12 +906,19 @@ function openConnectionModal() {
     type = id;
     const t = dbType(id);
     for (const b of typeSeg.children) b.classList.toggle('on', b.dataset.id === id);
-    serverBox.hidden = id === 'sqlite';
+    serverBox.hidden = id === 'sqlite' || id === 'bigquery';
     sqliteBox.hidden = id !== 'sqlite';
-    if (id !== 'sqlite') {
+    bigqueryBox.hidden = id !== 'bigquery';
+    const redis = id === 'redis';
+    serverBox.querySelector('.db-label span').textContent = redis ? 'Database number' : 'Database';
+    serverBox.querySelector('.ssl-label span').textContent = redis ? 'TLS' : 'SSL';
+    ssl.options[2].textContent = redis ? 'Require (rediss://)' : 'Require';
+    user.placeholder = redis ? 'default (optional)' : t.user || '';
+    if (id !== 'sqlite' && id !== 'bigquery') {
       port.placeholder = String(t.port);
-      user.placeholder = t.user;
-      database.placeholder = id === 'postgres' ? 'postgres' : 'mydb';
+      if (!redis) user.placeholder = t.user;
+      database.placeholder = id === 'postgres' ? 'postgres' : redis ? '0' : 'mydb';
+      options.placeholder = redis ? 'protocol=resp3' : 'application_name=studio&connect_timeout=10';
       if (!keepPort && (!port.value || port.value === String(prev.port))) port.value = String(t.port);
     }
     updatePreview();
@@ -738,13 +926,14 @@ function openConnectionModal() {
   for (const t of DB_TYPES) {
     typeSeg.append(h('button', { type: 'button', dataset: { id: t.id }, onclick: () => setType(t.id) }, t.label));
   }
-  for (const el of [host, port, user, password, database, options, file]) el.addEventListener('input', updatePreview);
+  for (const el of [host, port, user, password, database, options, file, project, dataset, keyFile, location, maxBytes, endpoint]) el.addEventListener('input', updatePreview);
   ssl.addEventListener('change', updatePreview);
 
   const fillFields = (u) => {
     const f = parseConnUrl(u);
     host.value = f.host; port.value = f.port; user.value = f.user; password.value = f.password;
     database.value = f.database; ssl.value = f.ssl; options.value = f.options; file.value = f.file;
+    project.value = f.project; dataset.value = f.dataset; keyFile.value = f.keyFile; location.value = f.location; maxBytes.value = f.maxBytes; endpoint.value = f.endpoint;
     setType(f.type, { keepPort: true });
   };
 
@@ -761,7 +950,7 @@ function openConnectionModal() {
     fieldsPane.hidden = m !== 'fields';
     urlPane.hidden = m !== 'url';
     setStatus('');
-    setTimeout(() => (m === 'url' ? url : type === 'sqlite' ? file : host).focus(), 0);
+    setTimeout(() => (m === 'url' ? url : type === 'sqlite' ? file : type === 'bigquery' ? project : host).focus(), 0);
   };
   for (const [id, label] of modes) modeSeg.append(h('button', { type: 'button', dataset: { id }, onclick: () => setMode(id) }, label));
 
@@ -769,6 +958,12 @@ function openConnectionModal() {
   const validate = () => {
     if (mode === 'url') return url.value.trim() ? null : 'Enter a connection URL';
     if (type === 'sqlite') return file.value.trim() ? null : 'Enter the path to the database file';
+    if (type === 'bigquery') {
+      if (!project.value.trim()) return 'Enter the Google Cloud project ID';
+      if (maxBytes.value.trim() && !/^\d+$/.test(maxBytes.value.trim())) return 'Max bytes billed must be a whole number';
+      return null;
+    }
+    if (type === 'redis' && database.value.trim() && !/^\d+$/.test(database.value.trim())) return 'Database number must be 0, 1, 2…';
     if (!host.value.trim()) return 'Enter the host';
     const p = port.value.trim();
     if (p && !(/^\d+$/.test(p) && +p >= 1 && +p <= 65535)) return 'Port must be a number from 1 to 65535';
@@ -822,6 +1017,7 @@ function renderMain() {
   const tab = activeTab();
   const content = h('div', { class: 'tab-content', id: 'tab-content' });
   main.append(content);
+  if (!tab && isRedis() && state.schema.redis) { R.renderEmpty(content); return; }
   if (!tab) {
     content.append(h('div', { class: 'empty-main' },
       icon('db', 40),
@@ -832,8 +1028,14 @@ function renderMain() {
     ));
     return;
   }
+  renderTabContent(tab, content);
+}
+
+function renderTabContent(tab, content) {
   if (tab.type === 'table') renderTableView(tab, content);
   else if (tab.type === 'schema') renderSchemaView(tab, content);
+  else if (tab.type === 'rkey') R.renderKey(tab, content);
+  else if (tab.type === 'rcli') R.renderConsole(tab, content);
   else renderSqlView(tab, content);
 }
 
@@ -842,12 +1044,15 @@ function welcome() {
     h('img', { src: '/brand/symbol.svg', width: 96, height: 96, alt: '' }),
     h('h2', { class: 'welcome-title' }, 'Rowveil'),
     h('p', { class: 'welcome-tag' }, 'Database explorer & query tool'),
-    h('p', { class: 'muted' }, 'Browse and edit PostgreSQL, MySQL and SQLite databases.'),
+    h('p', { class: 'muted' }, 'Browse and edit PostgreSQL, MySQL, SQLite, Redis and BigQuery.'),
     h('button', { class: 'btn primary', onclick: openConnectionModal }, icon('plus'), 'Add connection'),
   );
 }
 
-function tabTitle(t) { return t.type === 'sql' ? t.title : t.type === 'schema' ? 'Schema' : t.table; }
+function tabTitle(t) {
+  if (t.type === 'rkey' || t.type === 'rcli') return R.tabTitle(t);
+  return t.type === 'sql' ? t.title : t.type === 'schema' ? 'Schema' : t.table;
+}
 
 function renderTabBar() {
   const bar = h('div', { class: 'tabbar' });
@@ -855,17 +1060,19 @@ function renderTabBar() {
     const dirty = t.type === 'table' && pendingCount(t) > 0;
     bar.append(h('div', {
       class: `tab${t.id === state.activeTab ? ' active' : ''}`,
-      title: t.type === 'table' ? `${t.schema}.${t.table}` : tabTitle(t),
+      title: t.type === 'table' ? `${t.schema}.${t.table}` : t.type === 'rkey' ? `db${t.db}: ${t.key}` : tabTitle(t),
       onclick: () => activate(t.id),
       onauxclick: (e) => { if (e.button === 1) closeTab(t.id); },
     },
-    icon(t.type === 'sql' ? 'terminal' : t.type === 'schema' ? 'schema' : (findTable(t.schema, t.table)?.kind === 'table' ? 'table' : 'view'), 13),
+    icon(t.type === 'rkey' || t.type === 'rcli' ? R.tabIcon(t) : t.type === 'sql' ? 'terminal' : t.type === 'schema' ? 'schema' : (findTable(t.schema, t.table)?.kind === 'table' ? 'table' : 'view'), 13),
     h('span', { class: 'tab-name' }, tabTitle(t)),
     dirty ? h('span', { class: 'dirty-dot' }) : null,
     h('button', { class: 'tab-close', onclick: (e) => { e.stopPropagation(); closeTab(t.id); } }, icon('x', 12)),
     ));
   }
-  bar.append(h('button', { class: 'icon-btn tab-add', title: 'New SQL console', onclick: () => openSqlTab() }, icon('plus', 14)));
+  bar.append(isRedis()
+    ? h('button', { class: 'icon-btn tab-add', title: 'New Redis console', onclick: () => R.openConsole() }, icon('plus', 14))
+    : h('button', { class: 'icon-btn tab-add', title: 'New SQL console', onclick: () => openSqlTab() }, icon('plus', 14)));
   return bar;
 }
 
@@ -988,9 +1195,7 @@ function refreshView(tab) {
   const hadFocus = wrap && wrap.contains(document.activeElement);
   const drawerScroll = $('.drawer-body', content)?.scrollTop;
   content.replaceChildren();
-  if (tab.type === 'table') renderTableView(tab, content);
-  else if (tab.type === 'schema') renderSchemaView(tab, content);
-  else renderSqlView(tab, content);
+  renderTabContent(tab, content);
   const nw = $('.grid-wrap', content);
   if (nw && scroll) { nw.scrollLeft = scroll[0]; nw.scrollTop = scroll[1]; }
   if (nw && hadFocus) nw.focus({ preventScroll: true });
@@ -1151,7 +1356,11 @@ function renderFooter(tab, meta) {
       h('span', { class: 'pending-text' }, h('span', { class: 'dirty-dot' }), `${n} unsaved change${n === 1 ? '' : 's'}`),
       h('button', { class: 'btn ghost sm', onclick: () => discardChanges(tab) }, icon('undo', 13), 'Discard'),
       h('button', { class: 'btn primary sm', onclick: () => saveChanges(tab) }, icon('check', 13), 'Save changes', h('span', { class: 'kbd' }, 'Ctrl S')),
-    ) : h('div', { class: 'muted small' }, tab.view === 'structure' ? '' : `${meta.columns.length} columns`),
+    ) : h('div', { class: 'muted small' }, tab.view === 'structure' ? '' : `${meta.columns.length} columns`,
+      state.schema?.dialect === 'bigquery' && tab.view !== 'structure'
+        ? h('span', { class: 'bq-note' }, (tab.filters.length || tab.sort.length || meta.kind !== 'table')
+          ? ' · filtered view: runs a query job (billed)' : ' · table preview: no query, free')
+        : null),
     tab.view === 'data' ? h('div', { class: 'pager' },
       h('select', {
         class: 'input sm', value: String(tab.pageSize), title: 'Rows per page',
@@ -1821,7 +2030,7 @@ const SQL_PARAM_TYPES = new Set('varchar char character numeric decimal float bi
 /** Tokenizes SQL into colored ranges: [{ from, to, cls }]. */
 function sqlTokens(src) {
   const out = [];
-  const re = state.schema?.dialect === 'mysql' ? SQL_TOKEN_RE.mysql : SQL_TOKEN_RE.std;
+  const re = backtickSql() ? SQL_TOKEN_RE.mysql : SQL_TOKEN_RE.std;
   for (const m of src.matchAll(re)) {
     const tok = m[0];
     if (!tok) continue;
@@ -1859,6 +2068,7 @@ const AC_FUNCTIONS = {
   postgres: 'now date_trunc to_char to_timestamp to_date extract age json_agg jsonb_agg array_agg string_agg json_build_object jsonb_build_object jsonb_array_elements jsonb_each jsonb_set gen_random_uuid generate_series unnest array_length regexp_replace split_part position initcap left right lpad rpad md5 random ceil floor date_part current_date current_timestamp'.split(' '),
   mysql: 'now curdate curtime date_format str_to_date date_add date_sub datediff timestampdiff unix_timestamp from_unixtime ifnull if group_concat json_extract json_unquote json_object json_array json_arrayagg uuid left right lpad rpad locate instr md5 rand ceil floor year month day'.split(' '),
   sqlite: 'ifnull iif datetime date time strftime julianday unixepoch json json_extract json_object json_array json_group_array group_concat typeof random printf instr hex quote total ltrim rtrim'.split(' '),
+  bigquery: 'current_date current_timestamp current_datetime date_trunc timestamp_trunc datetime_trunc date_diff timestamp_diff date_add date_sub timestamp_add format_date format_timestamp parse_date parse_timestamp extract safe_cast safe_divide ifnull if countif count_if approx_count_distinct array_agg array_length array_to_string string_agg split unnest struct generate_array generate_date_array json_value json_query json_extract json_extract_scalar to_json_string parse_json regexp_contains regexp_extract regexp_replace starts_with ends_with farm_fingerprint md5 sha256 any_value logical_and logical_or st_geogpoint st_distance',
 };
 const AC_TABLE_CONTEXT = new Set(['from', 'join', 'into', 'update', 'table', 'describe']);
 const AC_CLAUSE_KW = /\b(select|from|join|where|on|set|into|update|table|by|having|values|returning|using|describe)\b/gi;
@@ -1911,6 +2121,7 @@ function acQuote(name) {
   const dialect = state.schema?.dialect;
   const simple = dialect === 'postgres' ? /^[a-z_][a-z0-9_$]*$/ : /^[A-Za-z_][\w$]*$/;
   if (simple.test(name) && !SQL_KEYWORDS.includes(name.toLowerCase())) return name;
+  if (dialect === 'bigquery') return `\`${name.replace(/[\\`]/g, '\\$&')}\``;
   return dialect === 'mysql' ? `\`${name.replace(/`/g, '``')}\`` : `"${name.replace(/"/g, '""')}"`;
 }
 
@@ -1961,7 +2172,7 @@ function acSuggest(text, pos, forced) {
       items.push({ label: t.name, insert: acTableText(t), kind: t.kind === 'table' ? 'table' : 'view', detail: t.schema !== state.schema.defaultSchema ? t.schema : t.kind.replace('_', ' '), rank: tableCtx ? 0 : 2 });
     }
     if (dialect !== 'sqlite') {
-      for (const s of state.schema.schemas) items.push({ label: s, insert: acQuote(s), kind: 'schema', detail: dialect === 'mysql' ? 'database' : 'schema', rank: tableCtx ? 1 : 4 });
+      for (const s of state.schema.schemas) items.push({ label: s, insert: acQuote(s), kind: 'schema', detail: schemaWord(dialect).toLowerCase(), rank: tableCtx ? 1 : 4 });
     }
     if (!tableCtx || !word) {
       const upper = /^[A-Z]/.test(word);
@@ -1999,7 +2210,7 @@ function acSuggest(text, pos, forced) {
 // ---------------------------------------------------------------- SQL editor (CodeMirror 6)
 /** Splits SQL text into statements. Skips strings, quoted identifiers, comments and dollar-quoted bodies. */
 function splitSqlStatements(text) {
-  const mysql = state.schema?.dialect === 'mysql';
+  const mysql = backtickSql();
   const out = [];
   const n = text.length;
   let start = -1;
@@ -2144,11 +2355,11 @@ function sqlCompletionSource(ctx) {
 }
 
 function cmSqlDialect() {
-  return { postgres: CM.PostgreSQL, mysql: CM.MySQL, sqlite: CM.SQLite }[state.schema?.dialect] || CM.StandardSQL;
+  return { postgres: CM.PostgreSQL, mysql: CM.MySQL, sqlite: CM.SQLite, bigquery: CM.MySQL }[state.schema?.dialect] || CM.StandardSQL;
 }
 
 function prettifySql(view) {
-  const dialect = { postgres: CM.postgresql, mysql: CM.mysql, sqlite: CM.sqlite }[state.schema?.dialect] || CM.standardSql;
+  const dialect = { postgres: CM.postgresql, mysql: CM.mysql, sqlite: CM.sqlite, bigquery: CM.bigquery }[state.schema?.dialect] || CM.standardSql;
   const sel = view.state.selection.main;
   const from = sel.empty ? 0 : sel.from;
   const to = sel.empty ? view.state.doc.length : sel.to;
@@ -2354,7 +2565,8 @@ function renderSqlResults(tab) {
     }, `Result ${i + 1}`))) : null,
     h('span', { class: 'muted small' },
       res.columns.length ? `${fmtNum(res.rows.length)} row${res.rows.length === 1 ? '' : 's'}${res.truncated ? ' (truncated)' : ''}` : `${fmtNum(res.rowsAffected)} row${res.rowsAffected === 1 ? '' : 's'} affected`,
-      tab.duration != null ? ` · ${tab.duration.toFixed(1)} ms` : ''),
+      tab.duration != null ? ` · ${tab.duration.toFixed(1)} ms` : '',
+      res.info ? ` · ${res.info}` : ''),
     h('span', { class: 'spacer' }),
     res.columns.length ? h('button', { class: 'btn ghost sm', title: 'Copy all rows as JSON', onclick: () => { copyText(asJson()); toast('Copied'); } }, icon('copy', 13), 'Copy') : null,
     res.columns.length ? h('button', { class: 'btn ghost sm', onclick: () => download('result.csv', toCSV(names, res.rows), 'text/csv') }, icon('download', 13), 'CSV') : null,
@@ -2435,7 +2647,8 @@ function openSchemaTab() {
 }
 
 const sqlDialect = () => state.schema?.dialect || 'postgres';
-const qi = (name) => (sqlDialect() === 'mysql' ? `\`${String(name).replace(/`/g, '``')}\`` : `"${String(name).replace(/"/g, '""')}"`);
+const qi = (name) => (sqlDialect() === 'bigquery' ? `\`${String(name).replace(/[\\`]/g, '\\$&')}\``
+  : sqlDialect() === 'mysql' ? `\`${String(name).replace(/`/g, '``')}\`` : `"${String(name).replace(/"/g, '""')}"`);
 const qref = (schema, name) => (sqlDialect() === 'sqlite' || !schema ? qi(name) : `${qi(schema)}.${qi(name)}`);
 const lit = (v) => `'${String(v).replace(/'/g, "''")}'`;
 const colList = (cols) => cols.map(qi).join(', ');
@@ -2702,7 +2915,7 @@ function renderSchemaList(tab) {
       cat.schemas.map((s) => h('option', { value: s, selected: s === tab.schemaFilter }, s)))
     : null;
   return h('div', { class: 'schema-list' },
-    schemaPick ? h('div', { class: 'sb-row' }, h('label', { class: 'sb-label' }, cat.dialect === 'mysql' ? 'Database' : 'Schema'), schemaPick) : null,
+    schemaPick ? h('div', { class: 'sb-row' }, h('label', { class: 'sb-label' }, schemaWord(cat.dialect)), schemaPick) : null,
     h('div', { class: 'schema-list-head' },
       h('div', { class: 'sb-search-wrap' }, icon('search', 14), search),
       h('button', { class: 'icon-btn', title: 'Refresh', onclick: () => loadCatalog(tab, { keepDetail: true }) }, icon('refresh', 14)),
@@ -3289,6 +3502,14 @@ function initSidebarResizer() {
 window.addEventListener('beforeunload', (e) => {
   saveTabs();
   if (state.tabs.some((t) => t.type === 'table' && pendingCount(t) > 0)) { e.preventDefault(); e.returnValue = ''; }
+});
+
+// Redis has its own sidebar and views (static/redis.js).
+const R = createRedisUI({
+  h, icon, api, toast, state, store, openModal, openMenu, closeMenu, copyText, fmtNum, compact,
+  jsonPane, looksLikeJsonText, reformatJson,
+  conn, activeTab, activate, closeTab, saveTabs, renderSidebar, renderMain,
+  nextTabId: () => tabSeq++, nextConsoleNo: () => sqlSeq++,
 });
 
 boot();

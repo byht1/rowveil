@@ -2,7 +2,7 @@
 Type=Application
 Name=Rowveil
 GenericName=Database explorer
-Comment=Database explorer and query tool for PostgreSQL, MySQL and SQLite
+Comment=Database explorer and query tool for PostgreSQL, MySQL, SQLite, Redis and BigQuery
 Exec=rowveil %f
 Icon=rowveil
 Terminal=false

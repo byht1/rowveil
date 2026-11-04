@@ -28,7 +28,7 @@ Depends: libwebkit2gtk-4.1-0, libgtk-3-0
 Maintainer: Rowveil <99541944+byht1@users.noreply.github.com>
 Homepage: https://byht1.github.io/rowveil/
 Description: Database explorer and query tool
- Rowveil browses, edits and queries PostgreSQL, MySQL/MariaDB and SQLite
+ Rowveil browses, edits and queries PostgreSQL, MySQL/MariaDB, SQLite, Redis and BigQuery
  databases in a desktop window. It also includes rowveil-server, which
  serves the same UI to a web browser.
 CONTROL

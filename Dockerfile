@@ -28,5 +28,5 @@ ENV STUDIO_HOST=0.0.0.0 \
 EXPOSE 4983
 VOLUME /data
 LABEL org.opencontainers.image.title="Rowveil" \
-      org.opencontainers.image.description="Database explorer and query tool for PostgreSQL, MySQL and SQLite"
+      org.opencontainers.image.description="Database explorer and query tool for PostgreSQL, MySQL, SQLite, Redis and BigQuery"
 ENTRYPOINT ["rowveil-server"]

@@ -34,6 +34,8 @@
     <!-- Program -->
     <Component Id="MainExe" Directory="INSTALLFOLDER" Bitness="always64">
       <File Id="RowveilExe" Source="$(var.Root)\target\release\rowveil.exe" KeyPath="yes" />
+      <!-- The in-app updater uses this value to recognize an MSI install. -->
+      <RegistryValue Root="HKLM" Key="Software\Rowveil" Name="InstallDir" Value="[INSTALLFOLDER]" Type="string" />
     </Component>
 
     <Component Id="StartMenuShortcut" Directory="ProgramMenuFolder" Bitness="always64">

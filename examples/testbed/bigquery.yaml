@@ -1,0 +1,56 @@
+# Data for the BigQuery emulator (project "testbed").
+projects:
+  - id: testbed
+    datasets:
+      - id: shop
+        tables:
+          - id: customers
+            columns:
+              - { name: id, type: INTEGER, mode: REQUIRED }
+              - { name: name, type: STRING }
+              - { name: email, type: STRING }
+              - { name: country, type: STRING }
+              - { name: vip, type: BOOLEAN }
+              - { name: signed_up, type: TIMESTAMP }
+              - { name: tags, type: STRING, mode: REPEATED }
+              - name: address
+                type: RECORD
+                fields:
+                  - { name: city, type: STRING }
+                  - { name: zip, type: STRING }
+            data:
+              - { id: 1, name: Ada Lovelace, email: ada@example.com, country: GB, vip: true, signed_up: "2024-01-15T10:00:00Z", tags: [early, pro], address: { city: London, zip: N1 } }
+              - { id: 2, name: Alan Turing, email: alan@example.com, country: GB, vip: false, signed_up: "2024-02-01T08:30:00Z", tags: [], address: { city: Manchester, zip: M1 } }
+              - { id: 3, name: Grace Hopper, email: grace@example.com, country: US, vip: true, signed_up: "2024-03-10T12:15:00Z", tags: [navy], address: { city: New York, zip: "10001" } }
+              - { id: 4, name: Linus Torvalds, email: linus@example.com, country: FI, vip: false, signed_up: "2024-04-22T17:45:00Z", tags: [kernel, git], address: { city: Helsinki, zip: "00100" } }
+              - { id: 5, name: Margaret Hamilton, email: margaret@example.com, country: US, vip: true, signed_up: "2024-05-05T09:00:00Z", tags: [apollo], address: { city: Boston, zip: "02108" } }
+          - id: orders
+            columns:
+              - { name: id, type: INTEGER, mode: REQUIRED }
+              - { name: customer_id, type: INTEGER }
+              - { name: status, type: STRING }
+              - { name: total, type: NUMERIC }
+              - { name: weight_kg, type: FLOAT }
+              - { name: ordered_on, type: DATE }
+              - { name: meta, type: JSON }
+            data:
+              - { id: 1001, customer_id: 1, status: paid, total: "129.00", weight_kg: 1.2, ordered_on: "2024-06-01", meta: '{"channel":"web","coupon":null}' }
+              - { id: 1002, customer_id: 3, status: new, total: "9.50", weight_kg: 0.1, ordered_on: "2024-06-02", meta: '{"channel":"app"}' }
+              - { id: 1003, customer_id: 2, status: shipped, total: "54.20", weight_kg: 2.5, ordered_on: "2024-06-03", meta: '{"channel":"web","gift":true}' }
+              - { id: 1004, customer_id: 1, status: paid, total: "310.00", weight_kg: 4.0, ordered_on: "2024-06-05", meta: '{"channel":"phone"}' }
+              - { id: 1005, customer_id: 5, status: cancelled, total: "18.75", weight_kg: 0.4, ordered_on: "2024-06-07", meta: '{}' }
+              - { id: 1006, customer_id: 4, status: paid, total: "77.10", weight_kg: 1.9, ordered_on: "2024-06-08", meta: '{"channel":"web"}' }
+      - id: analytics
+        tables:
+          - id: page_views
+            columns:
+              - { name: day, type: DATE }
+              - { name: path, type: STRING }
+              - { name: views, type: INTEGER }
+              - { name: avg_seconds, type: FLOAT }
+            data:
+              - { day: "2024-06-01", path: /, views: 1200, avg_seconds: 31.5 }
+              - { day: "2024-06-01", path: /pricing, views: 340, avg_seconds: 64.2 }
+              - { day: "2024-06-02", path: /, views: 1430, avg_seconds: 29.8 }
+              - { day: "2024-06-02", path: /docs, views: 610, avg_seconds: 182.0 }
+              - { day: "2024-06-03", path: /, views: 990, avg_seconds: 33.1 }

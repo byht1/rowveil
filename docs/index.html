@@ -17,36 +17,65 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;600&display=swap" rel="stylesheet">
+  <script>
+    // Theme before first paint: saved choice, otherwise the system setting.
+    (() => {
+      let t = null;
+      try { t = localStorage.getItem('rv-site-theme'); } catch {}
+      if (t !== 'light' && t !== 'dark') t = matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
+      document.documentElement.dataset.theme = t;
+    })();
+  </script>
   <style>
     :root {
-      --indigo: #4f46e5; --indigo-dark: #4338ca; --violet: #8b5cf6; --lavender: #c4b5fd; --teal: #14b8a6;
-      --slate: #334155; --canvas: #f4f6fa; --ink: #171b2f; --text: #1f2937; --muted: #5b6478; --line: #e5e8f0;
+      --indigo: #4f46e5; --indigo-hover: #4338ca; --violet: #8b5cf6; --lavender: #c4b5fd; --teal: #14b8a6; --slate: #334155;
+      --bg: #ffffff; --surface: #ffffff; --canvas: #f4f6fa; --ink: #171b2f; --text: #1f2937; --muted: #5b6478; --line: #e5e8f0; --line-strong: #d6dae5;
+      --header-bg: rgba(255, 255, 255, 0.86); --glow: #eef0ff; --bar: #f8f9fc; --link: #4f46e5;
+      --ic-bg: #eef0ff; --ic-fg: #4f46e5; --ic-teal-bg: #e6faf7; --ic-teal-fg: #14b8a6;
+      --free-bg: linear-gradient(100deg, #f7f7ff 0%, #f4f6fa 55%, #ece9ff 100%);
+      --card-shadow: 0 1px 2px rgba(23, 27, 47, 0.04); --card-hover: #c7cbf5; --win-shadow: 0 30px 80px rgba(30, 27, 75, 0.16), 0 2px 8px rgba(30, 27, 75, 0.06);
+      --code-bg: #0f172a;
       --font: Inter, ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif;
       --mono: "JetBrains Mono", ui-monospace, Consolas, monospace;
+      color-scheme: light;
+    }
+    :root[data-theme="dark"] {
+      --indigo-hover: #6366f1; --slate: #cbd5e1;
+      --bg: #0b1020; --surface: #11162c; --canvas: #0e1326; --ink: #f4f6fa; --text: #d7dcea; --muted: #a3acc4; --line: #232a47; --line-strong: #323b66;
+      --header-bg: rgba(11, 16, 32, 0.82); --glow: rgba(79, 70, 229, 0.28); --bar: #141a33; --link: #a5b4fc;
+      --ic-bg: rgba(99, 102, 241, 0.16); --ic-fg: #a5b4fc; --ic-teal-bg: rgba(45, 212, 191, 0.12); --ic-teal-fg: #5eead4;
+      --free-bg: linear-gradient(100deg, #141a33 0%, #11162c 55%, #1d1a40 100%);
+      --card-shadow: 0 1px 2px rgba(0, 0, 0, 0.3); --card-hover: #3b4380; --win-shadow: 0 30px 80px rgba(0, 0, 0, 0.5), 0 0 0 1px rgba(99, 102, 241, 0.12);
+      --code-bg: #080c1a;
+      color-scheme: dark;
     }
     * { box-sizing: border-box; }
     html { scroll-behavior: smooth; }
-    body { margin: 0; background: #fff; color: var(--text); font: 16px/1.6 var(--font); -webkit-font-smoothing: antialiased; }
+    body { margin: 0; background: var(--bg); color: var(--text); font: 16px/1.6 var(--font); -webkit-font-smoothing: antialiased; transition: background 0.2s, color 0.2s; }
     a { color: inherit; }
     .wrap { max-width: 1200px; margin: 0 auto; padding: 0 28px; }
     img { max-width: 100%; }
 
-    header.top { position: sticky; top: 0; z-index: 10; background: rgba(255, 255, 255, 0.86); backdrop-filter: blur(12px); border-bottom: 1px solid var(--line); }
-    header.top .wrap { display: flex; align-items: center; gap: 36px; height: 72px; }
+    header.top { position: sticky; top: 0; z-index: 10; background: var(--header-bg); backdrop-filter: blur(12px); border-bottom: 1px solid var(--line); }
+    header.top .wrap { display: flex; align-items: center; gap: 28px; height: 72px; }
     .logo { display: flex; align-items: center; gap: 10px; text-decoration: none; color: var(--ink); font-weight: 700; font-size: 24px; letter-spacing: -0.02em; }
     .logo img { width: 36px; height: 36px; }
     nav.links { display: flex; gap: 32px; margin-left: auto; font-size: 15.5px; font-weight: 500; color: var(--ink); }
     nav.links a { text-decoration: none; opacity: 0.85; }
-    nav.links a:hover { opacity: 1; color: var(--indigo); }
+    nav.links a:hover { opacity: 1; color: var(--link); }
+    .theme-toggle { width: 40px; height: 40px; flex: none; display: grid; place-items: center; border-radius: 10px; border: 1px solid var(--line-strong); background: var(--surface); color: var(--ink); cursor: pointer; }
+    .theme-toggle:hover { border-color: var(--indigo); }
+    .theme-toggle svg { width: 19px; height: 19px; }
+    :root[data-theme="dark"] .theme-toggle .moon, :root:not([data-theme="dark"]) .theme-toggle .sun { display: none; }
     .btn { display: inline-flex; align-items: center; gap: 10px; padding: 13px 24px; border-radius: 10px; font-weight: 600; font-size: 16px; text-decoration: none; border: 1px solid transparent; transition: background 0.15s, transform 0.15s, border-color 0.15s; }
     .btn svg { width: 20px; height: 20px; flex: none; }
     .btn.primary { background: var(--indigo); color: #fff; box-shadow: 0 6px 20px rgba(79, 70, 229, 0.28); }
-    .btn.primary:hover { background: var(--indigo-dark); transform: translateY(-1px); }
-    .btn.outline { background: #fff; color: var(--ink); border-color: #d6dae5; }
+    .btn.primary:hover { background: var(--indigo-hover); transform: translateY(-1px); }
+    .btn.outline { background: var(--surface); color: var(--ink); border-color: var(--line-strong); }
     .btn.outline:hover { border-color: var(--indigo); }
     .btn.sm { padding: 9px 16px; font-size: 14.5px; }
 
-    .hero { padding: 72px 0 40px; background: radial-gradient(1100px 520px at 85% 10%, #eef0ff 0%, rgba(255, 255, 255, 0) 70%); }
+    .hero { padding: 72px 0 40px; background: radial-gradient(1100px 520px at 85% 10%, var(--glow) 0%, transparent 70%); }
     .hero .wrap { display: grid; grid-template-columns: 0.92fr 1.08fr; gap: 48px; align-items: center; }
     .hero-logo { display: flex; align-items: center; gap: 16px; margin-bottom: 18px; }
     .hero-logo img { width: 84px; height: 84px; }
@@ -55,9 +84,9 @@
     .lead { font-size: 19px; color: var(--muted); margin: 0 0 30px; max-width: 560px; }
     .cta { display: flex; flex-wrap: wrap; gap: 14px; align-items: center; }
     .cta small { width: 100%; color: var(--muted); font-size: 13.5px; }
-    .cta small a { color: var(--indigo); text-decoration: none; }
-    .window { min-width: 0; border-radius: 16px; overflow: hidden; background: #fff; border: 1px solid var(--line); box-shadow: 0 30px 80px rgba(30, 27, 75, 0.16), 0 2px 8px rgba(30, 27, 75, 0.06); }
-    .window .bar { display: flex; align-items: center; gap: 8px; height: 40px; padding: 0 14px; background: #f8f9fc; border-bottom: 1px solid var(--line); font-size: 13px; color: var(--muted); }
+    .cta small a { color: var(--link); text-decoration: none; }
+    .window { min-width: 0; border-radius: 16px; overflow: hidden; background: var(--surface); border: 1px solid var(--line); box-shadow: var(--win-shadow); }
+    .window .bar { display: flex; align-items: center; gap: 8px; height: 40px; padding: 0 14px; background: var(--bar); border-bottom: 1px solid var(--line); font-size: 13px; color: var(--muted); }
     .window .bar i { width: 11px; height: 11px; border-radius: 50%; display: inline-block; }
     .window .bar i:nth-child(1) { background: #ff5f57; } .window .bar i:nth-child(2) { background: #febc2e; } .window .bar i:nth-child(3) { background: #28c840; }
     .window .bar b { display: flex; align-items: center; gap: 7px; margin-left: 10px; color: var(--ink); font-weight: 600; }
@@ -70,26 +99,26 @@
     .head p { color: var(--muted); font-size: 18px; margin: 0; }
 
     .cards { display: grid; grid-template-columns: repeat(4, 1fr); gap: 20px; }
-    .card { min-width: 0; padding: 26px; border-radius: 16px; background: #fff; border: 1px solid var(--line); box-shadow: 0 1px 2px rgba(23, 27, 47, 0.04); transition: border-color 0.2s, box-shadow 0.2s, transform 0.2s; }
-    .card:hover { border-color: #c7cbf5; box-shadow: 0 10px 30px rgba(79, 70, 229, 0.08); transform: translateY(-2px); }
-    .card .ic { width: 48px; height: 48px; border-radius: 12px; display: grid; place-items: center; background: #eef0ff; color: var(--indigo); margin-bottom: 16px; }
+    .card { min-width: 0; padding: 26px; border-radius: 16px; background: var(--surface); border: 1px solid var(--line); box-shadow: var(--card-shadow); transition: border-color 0.2s, box-shadow 0.2s, transform 0.2s; }
+    .card:hover { border-color: var(--card-hover); box-shadow: 0 10px 30px rgba(79, 70, 229, 0.1); transform: translateY(-2px); }
+    .card .ic { width: 48px; height: 48px; border-radius: 12px; display: grid; place-items: center; background: var(--ic-bg); color: var(--ic-fg); margin-bottom: 16px; }
     .card .ic svg { width: 24px; height: 24px; }
-    .card .ic.teal { background: #e6faf7; color: var(--teal); }
+    .card .ic.teal { background: var(--ic-teal-bg); color: var(--ic-teal-fg); }
     .card h3 { margin: 0 0 8px; font-size: 19px; color: var(--ink); letter-spacing: -0.01em; }
     .card p { margin: 0; color: var(--muted); font-size: 15px; }
 
-    .free { margin-top: 32px; display: flex; align-items: center; gap: 22px; padding: 22px 30px; border-radius: 16px; border: 1px solid var(--line); background: linear-gradient(100deg, #f7f7ff 0%, #f4f6fa 55%, #ece9ff 100%); position: relative; overflow: hidden; }
+    .free { margin-top: 32px; display: flex; align-items: center; gap: 22px; padding: 22px 30px; border-radius: 16px; border: 1px solid var(--line); background: var(--free-bg); position: relative; overflow: hidden; }
     .free::after { content: ""; position: absolute; right: -40px; top: -20px; width: 380px; height: 140px; background: radial-gradient(closest-side, rgba(20, 184, 166, 0.22), transparent 70%), radial-gradient(closest-side at 70% 60%, rgba(139, 92, 246, 0.25), transparent 70%); }
     .free svg { width: 30px; height: 30px; color: var(--violet); flex: none; }
     .free b { font-size: 22px; color: var(--ink); white-space: nowrap; }
     .free span { color: var(--muted); position: relative; z-index: 1; }
-    .free .sep { width: 1px; height: 32px; background: #d6dae5; }
+    .free .sep { width: 1px; height: 32px; background: var(--line-strong); }
 
     .tabs { display: flex; justify-content: center; flex-wrap: wrap; gap: 8px; margin-bottom: 24px; }
-    .tabs button { font: 600 14.5px var(--font); color: var(--slate); background: #fff; border: 1px solid var(--line); border-radius: 10px; padding: 9px 16px; cursor: pointer; }
+    .tabs button { font: 600 14.5px var(--font); color: var(--slate); background: var(--surface); border: 1px solid var(--line); border-radius: 10px; padding: 9px 16px; cursor: pointer; }
     .tabs button[aria-selected="true"] { color: #fff; background: var(--indigo); border-color: var(--indigo); }
     .caption { text-align: center; color: var(--muted); margin: 18px auto 0; max-width: 700px; min-height: 52px; }
-    .caption a { color: var(--indigo); }
+    .caption a { color: var(--link); }
     .gallery .window { max-width: 1100px; margin: 0 auto; }
 
     .split { display: grid; grid-template-columns: 1fr 1fr; gap: 48px; align-items: center; }
@@ -100,14 +129,14 @@
     .checks li::before { content: "✓"; color: var(--teal); font-weight: 700; }
     .keys { display: grid; gap: 8px; }
     .key { display: flex; justify-content: space-between; align-items: center; gap: 12px; padding: 12px 16px; border-radius: 12px; background: var(--canvas); border: 1px solid var(--line); font-size: 15px; color: var(--ink); }
-    kbd { font: 600 12px var(--mono); padding: 3px 8px; border-radius: 6px; background: #fff; border: 1px solid #d6dae5; border-bottom-width: 2px; color: var(--ink); white-space: nowrap; }
+    kbd { font: 600 12px var(--mono); padding: 3px 8px; border-radius: 6px; background: var(--surface); border: 1px solid var(--line-strong); border-bottom-width: 2px; color: var(--ink); white-space: nowrap; }
 
     .dl { display: grid; grid-template-columns: repeat(3, 1fr); gap: 20px; }
     .dl .card { display: flex; flex-direction: column; gap: 12px; }
     .dl .card .btn { align-self: flex-start; margin-top: auto; }
     .alt { font-size: 14px; color: var(--muted); }
-    a.alt:hover { color: var(--indigo); }
-    pre.code { margin: 0; padding: 14px 16px; border-radius: 12px; background: #0f172a; font: 13px/1.6 var(--mono); color: #e2e8f0; overflow-x: auto; white-space: pre; }
+    a.alt:hover { color: var(--link); }
+    pre.code { margin: 0; padding: 14px 16px; border-radius: 12px; background: var(--code-bg); font: 13px/1.6 var(--mono); color: #e2e8f0; overflow-x: auto; white-space: pre; }
     pre.code .c { color: #64748b; }
     pre.code .k { color: var(--lavender); }
     .bg-canvas { background: var(--canvas); }
@@ -120,13 +149,14 @@
     footer .sp { flex: 1; }
     footer nav { display: flex; gap: 26px; color: var(--ink); }
     footer nav a { text-decoration: none; }
-    footer nav a:hover { color: var(--indigo); }
+    footer nav a:hover { color: var(--link); }
 
     @media (max-width: 1000px) {
       .hero .wrap, .split { grid-template-columns: 1fr; }
       .cards { grid-template-columns: repeat(2, 1fr); }
       .dl { grid-template-columns: 1fr; }
       nav.links { display: none; }
+      .theme-toggle { margin-left: auto; }
     }
     @media (max-width: 640px) {
       .wrap { padding: 0 16px; }
@@ -134,9 +164,9 @@
       .hero-logo span { font-size: 44px; } .hero-logo img { width: 64px; height: 64px; }
       .free { flex-wrap: wrap; } .free .sep { display: none; } .free b { white-space: normal; }
       section { padding: 60px 0; }
-      header.top .wrap { gap: 16px; }
+      header.top .wrap { gap: 12px; }
     }
-    @media (prefers-reduced-motion: reduce) { html { scroll-behavior: auto; } .btn, .card { transition: none; } }
+    @media (prefers-reduced-motion: reduce) { html { scroll-behavior: auto; } .btn, .card, body { transition: none; } }
   </style>
 </head>
 <body>
@@ -149,6 +179,10 @@
         <a href="https://github.com/byht1/rowveil#readme">Docs</a>
         <a href="https://github.com/byht1/rowveil">GitHub</a>
       </nav>
+      <button class="theme-toggle" id="theme-toggle" type="button" aria-label="Switch light / dark theme" title="Switch light / dark theme">
+        <svg class="moon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12.8A9 9 0 1 1 11.2 3a7 7 0 0 0 9.8 9.8z"/></svg>
+        <svg class="sun" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="12" r="4.5"/><path d="M12 2v2M12 20v2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M2 12h2M20 12h2M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4"/></svg>
+      </button>
       <a class="btn primary sm" href="#downloads">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3v12m0 0-5-5m5 5 5-5M4 19h16"/></svg>
         Download
@@ -176,7 +210,7 @@
       </div>
       <div class="window">
         <div class="bar"><i></i><i></i><i></i><b><img src="assets/symbol.svg" alt="">Rowveil</b></div>
-        <img src="assets/screens/grid.png" alt="Rowveil browsing the users table" width="1440" height="860">
+        <img data-shot="grid" src="assets/screens/grid-light.png" alt="Rowveil browsing the users table" width="1440" height="860">
       </div>
     </div>
   </section>
@@ -218,18 +252,18 @@
     <div class="wrap">
       <div class="head">
         <h2>See it in action</h2>
-        <p>Light and dark themes follow your system — eight themes in total.</p>
+        <p>Light and dark themes follow your system — and so does this page.</p>
       </div>
       <div class="tabs" role="tablist">
         <button role="tab" aria-selected="true" data-i="0">SQL Studio</button>
         <button role="tab" aria-selected="false" data-i="1">JSON</button>
         <button role="tab" aria-selected="false" data-i="2">Schema</button>
         <button role="tab" aria-selected="false" data-i="3">Data</button>
-        <button role="tab" aria-selected="false" data-i="4">Dark theme</button>
+        <button role="tab" aria-selected="false" data-i="4">Roles</button>
       </div>
       <div class="window">
         <div class="bar"><i></i><i></i><i></i><b><img src="assets/symbol.svg" alt="">Rowveil</b></div>
-        <img id="shot-img" src="assets/screens/sql.png" alt="Rowveil screenshot" width="1440" height="860">
+        <img id="shot-img" data-shot="sql" src="assets/screens/sql-light.png" alt="Rowveil screenshot" width="1440" height="860">
       </div>
       <p class="caption" id="shot-caption">Write SQL with highlighting and autocomplete. ▶ next to each statement runs just that one.</p>
     </div>
@@ -343,18 +377,39 @@ rowveil postgres://user@host/db</pre>
     })();
 
     const shots = [
-      ['sql.png', 'Write SQL with highlighting and autocomplete. ▶ next to each statement runs just that one.'],
-      ['json.png', 'JSON stored in a text column, formatted and foldable. Saving keeps the original compact layout.'],
-      ['schema.png', 'Manage structure: columns, constraints, indexes, policies. Every change shows its SQL first.'],
-      ['grid.png', 'Browse any table: sort by several columns, filter, resize and hide columns, follow foreign keys.'],
-      ['roles-dark.png', 'Roles and privileges in the dark theme.'],
+      ['sql', 'Write SQL with highlighting and autocomplete. ▶ next to each statement runs just that one.'],
+      ['json', 'JSON stored in a text column, formatted and foldable. Saving keeps the original compact layout.'],
+      ['schema', 'Manage structure: columns, constraints, indexes, policies. Every change shows its SQL first.'],
+      ['grid', 'Browse any table: sort by several columns, filter, resize and hide columns, follow foreign keys.'],
+      ['roles', 'Roles, privileges and row-level security for PostgreSQL.'],
     ];
+    const root = document.documentElement;
+    // Screenshots match the page theme: <name>-light.png / <name>-dark.png.
+    const syncShots = () => {
+      const mode = root.dataset.theme === 'dark' ? 'dark' : 'light';
+      for (const im of document.querySelectorAll('img[data-shot]')) im.src = `assets/screens/${im.dataset.shot}-${mode}.png`;
+    };
+    const setTheme = (t, save) => {
+      root.dataset.theme = t;
+      if (save) { try { localStorage.setItem('rv-site-theme', t); } catch {} }
+      syncShots();
+    };
+    document.getElementById('theme-toggle').addEventListener('click', () => setTheme(root.dataset.theme === 'dark' ? 'light' : 'dark', true));
+    // Follow system changes until the visitor picks a theme.
+    matchMedia('(prefers-color-scheme: dark)').addEventListener('change', (e) => {
+      let saved = null;
+      try { saved = localStorage.getItem('rv-site-theme'); } catch {}
+      if (!saved) setTheme(e.matches ? 'dark' : 'light', false);
+    });
+    syncShots();
+
     const img = document.getElementById('shot-img');
     const cap = document.getElementById('shot-caption');
     for (const b of document.querySelectorAll('.tabs button')) {
       b.addEventListener('click', () => {
-        const [file, text] = shots[+b.dataset.i];
-        img.src = `assets/screens/${file}`;
+        const [name, text] = shots[+b.dataset.i];
+        img.dataset.shot = name;
+        syncShots();
         cap.textContent = text;
         for (const x of document.querySelectorAll('.tabs button')) x.setAttribute('aria-selected', String(x === b));
       });

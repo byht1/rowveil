@@ -73,7 +73,7 @@ cargo build --release                       # Windows / macOS
 sudo apt install libwebkit2gtk-4.1-dev libgtk-3-dev && cargo build --release   # Linux
 ```
 
-Пакети: `packaging/windows/build-msi.ps1` (WiX 5), `packaging/macos/build-dmg.sh`, `packaging/linux/package.sh`. Тег `v*` запускає `.github/workflows/release.yml`: збірка для всіх трьох систем, перевірка інсталяторів і чернетка релізу.
+Пакети: `packaging/windows/build-msi.ps1` (WiX 5), `packaging/macos/build-dmg.sh`, `packaging/linux/package.sh`. Тег `v*` запускає `.github/workflows/release.yml`: збірка для всіх трьох систем, перевірка інсталяторів і публікація релізу.
 
 ## Браузерна версія і Docker
 

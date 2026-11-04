@@ -1,6 +1,6 @@
 name: Release
 
-# Push a tag (v1.2.3) to build every platform and attach the files to a draft release.
+# Push a tag (v1.2.3) to build every platform and publish a release with the files.
 # Run it by hand (workflow_dispatch) to only build and keep the files as workflow artifacts.
 on:
   push:
@@ -103,7 +103,7 @@ jobs:
           path: dist/*
 
   publish:
-    name: Draft release
+    name: Publish release
     needs: [windows, macos, linux]
     if: startsWith(github.ref, 'refs/tags/')
     runs-on: ubuntu-latest
@@ -118,9 +118,11 @@ jobs:
           merge-multiple: true
       - name: Checksums
         run: cd dist && sha256sum * > SHA256SUMS.txt && cat SHA256SUMS.txt
-      - name: Create or update the draft release
+      - name: Publish the release
+        # The files go to a draft first; the release becomes public (and latest) only with all files attached.
         run: |
           if ! gh release view "$TAG" >/dev/null 2>&1; then
             gh release create "$TAG" --draft --title "Rowveil ${TAG#v}" --notes-file packaging/release-notes.md
           fi
           gh release upload "$TAG" dist/* --clobber
+          gh release edit "$TAG" --draft=false --latest

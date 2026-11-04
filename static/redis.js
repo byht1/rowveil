@@ -166,6 +166,7 @@ export function createRedisUI(ctx) {
     const consoleActive = ctx.activeTab()?.type === 'rcli';
     sb.append(h('button', { class: `sb-item sql-item${consoleActive ? ' active' : ''}`, onclick: () => openConsole() }, icon('terminal'), h('span', {}, 'Redis console'), h('span', { class: 'kbd' }, '+')));
     if (!readOnly()) sb.append(h('button', { class: 'sb-item sql-item', onclick: () => createKeyForm() }, icon('plus'), h('span', {}, 'Add key')));
+    ctx.renderSavedSection(sb);
 
     const total = keyCount(r.db);
     sb.append(h('div', { class: 'sb-section' },
@@ -720,6 +721,22 @@ export function createRedisUI(ctx) {
     return /^[^\s"'\\]+$/.test(s) ? s : `"${s.replace(/\\/g, '\\\\').replace(/"/g, '\\"').replace(/\n/g, '\\n')}"`;
   }
 
+  /** Puts a command into the active console (or a new one) without running it. */
+  function insertCommand(cmd) {
+    const t = ctx.activeTab();
+    if (t?.type === 'rcli') { t.draft = cmd; ctx.renderMain(); return; }
+    openConsoleWith(cmd);
+  }
+
+  /** Saves the console input, or the last command when the input is empty. */
+  async function saveCommand(tab, input) {
+    const text = input.value.trim() || tab.log[tab.log.length - 1]?.cmd || '';
+    if (!text) { toast('Type a command first', 'error'); return; }
+    const q = await ctx.openSaveQueryModal({ text, name: ctx.suggestQueryName(text) });
+    if (q) toast(`Saved "${q.name}"`, 'success');
+    input.focus();
+  }
+
   function openConsoleWith(cmd) {
     const t = newConsoleTab();
     t.draft = cmd;
@@ -820,12 +837,21 @@ export function createRedisUI(ctx) {
         e.preventDefault(); hpos = Math.min(history.length, hpos + 1); input.value = history[hpos] || ''; grow();
       } else if (e.key === 'l' && e.ctrlKey) {
         e.preventDefault(); tab.log = []; draw();
+      } else if (e.key === 's' && (e.ctrlKey || e.metaKey)) {
+        e.preventDefault(); saveCommand(tab, input);
       }
     });
     root.append(h('div', { class: 'r-console' },
       h('div', { class: 'r-toolbar' },
-        h('span', { class: 'muted small' }, `Database db${r.db} · ↑/↓ history · Ctrl+L clear`),
+        h('span', { class: 'muted small' }, `Database db${r.db} · ↑/↓ history · Ctrl+S save · Ctrl+L clear`),
         h('span', { class: 'spacer' }),
+        h('button', { class: 'btn ghost sm', title: 'Save the command (or the last one) for later', onclick: () => saveCommand(tab, input) }, icon('bookmark', 13), 'Save'),
+        h('button', {
+          class: 'btn ghost sm', title: 'Insert a saved command', disabled: !ctx.visibleQueries().length,
+          onclick: (e) => openMenu(e.currentTarget, ctx.visibleQueries().map((q) => h('div', {
+            class: 'menu-item', title: q.text, onclick: () => { closeMenu(); input.value = q.text; tab.draft = q.text; grow(); input.focus(); },
+          }, icon('bookmark', 13), h('span', { class: 'menu-text' }, q.name))), 'scroll-menu wide-menu'),
+        }, 'Saved', icon('chevron', 12)),
         h('button', { class: 'btn ghost sm', onclick: () => { tab.log = []; draw(); input.focus(); } }, 'Clear')),
       out,
       h('div', { class: 'r-input-wrap' }, h('span', { class: 'r-prompt mono' }, `db${r.db}>`), input,
@@ -859,5 +885,5 @@ export function createRedisUI(ctx) {
         readOnly() ? null : h('button', { class: 'btn', onclick: () => createKeyForm() }, icon('plus'), 'Add key'))));
   }
 
-  return { onConnect, renderSidebar, renderKey, renderConsole, renderEmpty, saveTab, restoreTab, tabTitle, tabIcon, openConsole, load };
+  return { onConnect, renderSidebar, renderKey, renderConsole, renderEmpty, saveTab, restoreTab, tabTitle, tabIcon, openConsole, insertCommand, load };
 }

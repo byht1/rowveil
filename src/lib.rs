@@ -7,6 +7,7 @@ pub mod data;
 pub mod ddl;
 pub mod db;
 pub mod kv;
+pub mod queries;
 pub mod schema;
 pub mod update;
 
@@ -67,6 +68,8 @@ struct AppState {
     schemas: RwLock<HashMap<String, Arc<DbSchema>>>,
     store: PathBuf,
     env_tags: PathBuf,
+    queries: RwLock<Vec<queries::SavedQuery>>,
+    queries_path: PathBuf,
     read_only: bool,
     auth: Option<String>,
     app_token: Option<String>,
@@ -300,6 +303,85 @@ async fn update_connection(State(st): State<Shared>, Path(id): Path<String>, Jso
         config::save_user_connections(&st.store, &conns)?;
     }
     Ok(Json(json!(info)))
+}
+
+// ---------------------------------------------------------------- saved queries
+
+async fn list_queries(State(st): State<Shared>) -> Json<Vec<queries::SavedQuery>> {
+    Json(st.queries.read().await.clone())
+}
+
+#[derive(Deserialize)]
+#[serde(rename_all = "camelCase")]
+struct NewQuery {
+    name: String,
+    kind: String,
+    text: String,
+    dialect: String,
+    connection_id: Option<String>,
+}
+
+fn bad(msg: impl Into<String>) -> ApiError {
+    ApiError(StatusCode::BAD_REQUEST, msg.into())
+}
+
+async fn add_query(State(st): State<Shared>, Json(q): Json<NewQuery>) -> ApiResult<Json<queries::SavedQuery>> {
+    if !queries::KINDS.contains(&q.kind.as_str()) {
+        return Err(bad("Unknown query kind"));
+    }
+    if q.dialect.is_empty() || !q.dialect.chars().all(|c| c.is_ascii_lowercase()) {
+        return Err(bad("Unknown dialect"));
+    }
+    queries::check_text(&q.text).map_err(bad)?;
+    let saved = queries::SavedQuery {
+        id: uuid::Uuid::new_v4().to_string(),
+        name: queries::clean_name(&q.name).map_err(bad)?,
+        kind: q.kind,
+        text: q.text,
+        dialect: q.dialect,
+        connection_id: q.connection_id.filter(|c| !c.is_empty()),
+        updated_at: queries::now_ms(),
+    };
+    let mut all = st.queries.write().await;
+    all.push(saved.clone());
+    queries::save(&st.queries_path, &all)?;
+    Ok(Json(saved))
+}
+
+#[derive(Deserialize)]
+#[serde(rename_all = "camelCase")]
+struct QueryPatch {
+    name: Option<String>,
+    text: Option<String>,
+    /// A connection id limits the query to that connection; "" shares it with all connections of the dialect.
+    connection_id: Option<String>,
+}
+
+async fn update_query(State(st): State<Shared>, Path(id): Path<String>, Json(p): Json<QueryPatch>) -> ApiResult<Json<queries::SavedQuery>> {
+    let mut all = st.queries.write().await;
+    let q = all.iter_mut().find(|q| q.id == id).ok_or_else(|| not_found("Saved query"))?;
+    if let Some(name) = p.name {
+        q.name = queries::clean_name(&name).map_err(bad)?;
+    }
+    if let Some(text) = p.text {
+        queries::check_text(&text).map_err(bad)?;
+        q.text = text;
+    }
+    if let Some(c) = p.connection_id {
+        q.connection_id = Some(c).filter(|c| !c.is_empty());
+    }
+    q.updated_at = queries::now_ms();
+    let out = q.clone();
+    queries::save(&st.queries_path, &all)?;
+    Ok(Json(out))
+}
+
+async fn delete_query(State(st): State<Shared>, Path(id): Path<String>) -> ApiResult<Json<Value>> {
+    let mut all = st.queries.write().await;
+    let pos = all.iter().position(|q| q.id == id).ok_or_else(|| not_found("Saved query"))?;
+    all.remove(pos);
+    queries::save(&st.queries_path, &all)?;
+    Ok(Json(json!({ "ok": true })))
 }
 
 async fn delete_connection(State(st): State<Shared>, Path(id): Path<String>) -> ApiResult<Json<Value>> {
@@ -688,6 +770,7 @@ async fn basic_auth(State(st): State<Shared>, headers: HeaderMap, req: Request, 
 pub fn router(opts: &Options) -> (Router, PathBuf) {
     let store = config::store_path(&opts.data_dir);
     let env_tags = config::env_tags_path(&opts.data_dir);
+    let queries_path = queries::store_path(&opts.data_dir);
     let mut conns = config::env_connections(opts.url.as_deref());
     let overrides = config::load_env_tag_overrides(&env_tags);
     for c in &mut conns {
@@ -707,6 +790,8 @@ pub fn router(opts: &Options) -> (Router, PathBuf) {
         schemas: RwLock::new(HashMap::new()),
         store: store.clone(),
         env_tags,
+        queries: RwLock::new(queries::load(&queries_path)),
+        queries_path,
         read_only: opts.read_only,
         auth,
         app_token: opts.app_token.clone(),
@@ -734,6 +819,8 @@ pub fn router(opts: &Options) -> (Router, PathBuf) {
         .route("/connections/{id}/redis/key", post(redis_key))
         .route("/connections/{id}/redis/edit", post(redis_edit))
         .route("/connections/{id}/redis/command", post(redis_command))
+        .route("/queries", get(list_queries).post(add_query))
+        .route("/queries/{id}", axum::routing::delete(delete_query).patch(update_query))
         .route("/update/check", get(update_check))
         .route("/update/download", post(update_download))
         .route("/update/progress", get(update_progress))

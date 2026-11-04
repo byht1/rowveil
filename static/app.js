@@ -36,6 +36,7 @@ const ICONS = {
   refresh: '<path d="M21 12a9 9 0 1 1-2.64-6.36"/><path d="M21 3v6h-6"/>',
   filter: '<path d="M3 5h18l-7 8v6l-4 2v-8z"/>',
   columns: '<rect x="3" y="4" width="18" height="16" rx="2"/><path d="M9 4v16M15 4v16"/>',
+  bookmark: '<path d="M6 3h12v18l-6-4.5L6 21z"/>',
   trash: '<path d="M3 6h18M8 6V4h8v2M6 6l1 14h10l1-14"/>',
   left: '<path d="m15 18-6-6 6-6"/>',
   right: '<path d="m9 18 6-6-6-6"/>',
@@ -163,6 +164,7 @@ const state = {
   search: '',
   tabs: [],
   activeTab: null,
+  savedQueries: [],
   loadingSchema: false,
   schemaError: null,
 };
@@ -184,7 +186,7 @@ const schemaWord = (d) => ({ mysql: 'Database', bigquery: 'Dataset' }[d] || 'Sch
 function saveTabs() {
   if (!state.connId) return;
   const tabs = state.tabs.map((t) => {
-    if (t.type === 'sql') return { type: 'sql', title: t.title, sql: t.sql };
+    if (t.type === 'sql') return { type: 'sql', title: t.title, sql: t.sql, savedId: t.savedId || undefined, resHidden: t.resHidden?.names.length ? t.resHidden : undefined };
     if (t.type === 'schema') return { type: 'schema', section: t.section, sel: t.sel, schemaFilter: t.schemaFilter };
     if (t.type === 'rkey' || t.type === 'rcli') return R.saveTab(t);
     return { type: 'table', schema: t.schema, table: t.table, filters: t.filters, sort: t.sort, pageSize: t.pageSize, hidden: t.hidden, widths: t.widths, view: t.view };
@@ -200,7 +202,7 @@ function restoreTabs() {
   if (!saved) return;
   if (saved.schemaName && state.schema.schemas.includes(saved.schemaName)) state.schemaName = saved.schemaName;
   for (const t of saved.tabs || []) {
-    if (t.type === 'sql') state.tabs.push(newSqlTab(t.title, t.sql));
+    if (t.type === 'sql') state.tabs.push(Object.assign(newSqlTab(t.title, t.sql), { savedId: t.savedId || null, resHidden: t.resHidden?.sig ? t.resHidden : null }));
     else if (t.type === 'schema') state.tabs.push(newSchemaTab(t));
     else if (t.type === 'rkey' || t.type === 'rcli') { if (isRedis()) state.tabs.push(R.restoreTab(t)); }
     else if (findTable(t.schema, t.table)) state.tabs.push(newTableTab(t.schema, t.table, t));
@@ -235,7 +237,7 @@ function newTableTab(schema, table, opts = {}) {
 }
 
 function newSqlTab(title, sql = '') {
-  return { id: tabSeq++, type: 'sql', title: title || `SQL ${sqlSeq++}`, sql, results: null, error: null, running: false, activeResult: 0, duration: null };
+  return { id: tabSeq++, type: 'sql', title: title || `SQL ${sqlSeq++}`, sql, results: null, error: null, running: false, activeResult: 0, duration: null, resHidden: null };
 }
 
 // ---------------------------------------------------------------- boot
@@ -245,6 +247,7 @@ async function boot() {
   try {
     state.info = await api('/info');
     state.connections = await api('/connections');
+    await loadSavedQueries();
   } catch (e) {
     toast(e.message, 'error');
   }
@@ -507,6 +510,7 @@ function renderSidebar() {
   sb.append(h('button', { class: 'sb-item sql-item', onclick: () => openSqlTab() }, icon('terminal'), h('span', {}, 'SQL console'), h('span', { class: 'kbd' }, '+')));
   const schemaActive = activeTab()?.type === 'schema';
   sb.append(h('button', { class: `sb-item sql-item schema-item${schemaActive ? ' active' : ''}`, onclick: openSchemaTab }, icon('schema'), h('span', {}, 'Schema')));
+  renderSavedSection(sb);
 
   sb.append(h('div', { class: 'sb-section' }, h('span', {}, 'Tables'),
     h('button', { class: 'icon-btn', title: 'Refresh schema', onclick: refreshSchema }, icon('refresh', 13))));
@@ -700,19 +704,26 @@ function openEditConnection(c) {
 }
 
 function openConnMenu(anchor) {
-  const allTags = [...new Set(state.connections.flatMap((c) => c.tags || []))].sort((a, b) => TAG_PRESETS.indexOf(a) - TAG_PRESETS.indexOf(b) || a.localeCompare(b));
+  // Presets first (in their order), then custom tags A–Z.
+  const rank = (t) => { const i = TAG_PRESETS.indexOf(t); return i < 0 ? TAG_PRESETS.length : i; };
+  const allTags = [...new Set(state.connections.flatMap((c) => c.tags || []))].sort((a, b) => rank(a) - rank(b) || a.localeCompare(b));
   const filter = new Set((store.get('rs.connTagFilter', []) || []).filter((t) => allTags.includes(t)));
   const visible = state.connections.filter((c) => !filter.size || (c.tags || []).some((t) => filter.has(t)));
+  const apply = () => { store.set('rs.connTagFilter', [...filter]); closeMenu(); openConnMenu(anchor); };
+  // A click shows only that tag (a second click clears the filter). Ctrl / Shift + click adds or removes it.
+  const pick = (t, multi) => {
+    if (multi) { if (filter.has(t)) filter.delete(t); else filter.add(t); }
+    else if (filter.size === 1 && filter.has(t)) filter.clear();
+    else { filter.clear(); filter.add(t); }
+    apply();
+  };
   const filterBar = allTags.length ? h('div', { class: 'tag-filter', onclick: (e) => e.stopPropagation() },
     h('span', { class: 'muted small' }, 'Tags'),
+    h('button', { type: 'button', class: `tag-chip tone-other toggle${filter.size ? '' : ' on'}`, title: 'Show all connections', onclick: () => { filter.clear(); apply(); } }, 'All'),
     allTags.map((t) => h('button', {
-      type: 'button', class: `tag-chip tone-${tagTone(t)} toggle${filter.has(t) ? ' on' : ''}`, title: filter.has(t) ? 'Show all' : `Only ${t}`,
-      onclick: () => {
-        if (filter.has(t)) filter.delete(t); else filter.add(t);
-        store.set('rs.connTagFilter', [...filter]);
-        closeMenu();
-        openConnMenu(anchor);
-      },
+      type: 'button', class: `tag-chip tone-${tagTone(t)} toggle${filter.has(t) ? ' on' : ''}`,
+      title: `${filter.size === 1 && filter.has(t) ? 'Show all' : `Only ${t}`} · Ctrl+click to select several tags`,
+      onclick: (e) => pick(t, e.ctrlKey || e.metaKey || e.shiftKey),
     }, t))) : null;
   const items = visible.map((c) =>
     h('div', {
@@ -1188,7 +1199,7 @@ function renderTabBar() {
       onclick: () => activate(t.id),
       onauxclick: (e) => { if (e.button === 1) closeTab(t.id); },
     },
-    icon(t.type === 'rkey' || t.type === 'rcli' ? R.tabIcon(t) : t.type === 'sql' ? 'terminal' : t.type === 'schema' ? 'schema' : (findTable(t.schema, t.table)?.kind === 'table' ? 'table' : 'view'), 13),
+    icon(t.type === 'rkey' || t.type === 'rcli' ? R.tabIcon(t) : t.type === 'sql' ? (findSaved(t.savedId) ? 'bookmark' : 'terminal') : t.type === 'schema' ? 'schema' : (findTable(t.schema, t.table)?.kind === 'table' ? 'table' : 'view'), 13),
     h('span', { class: 'tab-name' }, tabTitle(t)),
     dirty ? h('span', { class: 'dirty-dot' }) : null,
     h('button', { class: 'tab-close', onclick: (e) => { e.stopPropagation(); closeTab(t.id); } }, icon('x', 12)),
@@ -1251,8 +1262,11 @@ function openSqlTab(sql = '') {
 function globalKeys(e) {
   const tab = activeTab();
   if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 's') {
-    if (tab && tab.type === 'table' && pendingCount(tab) > 0) { e.preventDefault(); saveChanges(tab); }
-    else e.preventDefault();
+    // The SQL editor and the Redis console handle Ctrl+S themselves (defaultPrevented).
+    if (e.defaultPrevented) return;
+    e.preventDefault();
+    if (tab && tab.type === 'table' && pendingCount(tab) > 0) saveChanges(tab);
+    else if (tab?.type === 'sql') saveSqlTab(tab);
   }
 }
 
@@ -1424,20 +1438,26 @@ function renderFilterPanel(tab, meta) {
 }
 
 function openColumnsMenu(anchor, tab, meta) {
+  columnsMenu(anchor, meta.columns.map((c) => ({ name: c.name, type: c.dataType })), () => tab.hidden,
+    (hidden) => { tab.hidden = hidden; saveTabs(); refreshView(tab); });
+}
+
+/**
+ * The "Columns" menu: a checkbox per column, "Show all" and "Hide all" (keeps the first column).
+ * `getHidden()` returns the hidden names; `setHidden(names)` stores them and redraws.
+ */
+function columnsMenu(anchor, cols, getHidden, setHidden) {
+  const names = [...new Set(cols.map((c) => c.name))];
   const items = [
     h('div', { class: 'menu-row' },
-      h('button', { class: 'btn ghost sm', onclick: () => { tab.hidden = []; saveTabs(); closeMenu(); refreshView(tab); } }, 'Show all'),
-      h('button', { class: 'btn ghost sm', onclick: () => { tab.hidden = meta.columns.slice(1).map((c) => c.name); saveTabs(); closeMenu(); refreshView(tab); } }, 'Hide all')),
-    ...meta.columns.map((c) => h('label', { class: 'menu-item check' },
+      h('button', { class: 'btn ghost sm', onclick: () => { closeMenu(); setHidden([]); } }, 'Show all'),
+      h('button', { class: 'btn ghost sm', onclick: () => { closeMenu(); setHidden(names.slice(1)); } }, 'Hide all')),
+    ...names.map((name) => h('label', { class: 'menu-item check' },
       h('input', {
-        type: 'checkbox', checked: !tab.hidden.includes(c.name),
-        onchange: (e) => {
-          tab.hidden = e.target.checked ? tab.hidden.filter((x) => x !== c.name) : [...tab.hidden, c.name];
-          saveTabs();
-          refreshView(tab);
-        },
+        type: 'checkbox', checked: !getHidden().includes(name),
+        onchange: (e) => setHidden(e.target.checked ? getHidden().filter((x) => x !== name) : [...getHidden(), name]),
       }),
-      h('span', { class: 'menu-text' }, c.name), h('small', { class: 'muted' }, c.dataType))),
+      h('span', { class: 'menu-text' }, name), h('small', { class: 'muted' }, cols.find((c) => c.name === name)?.type || ''))),
   ];
   openMenu(anchor, items, 'scroll-menu');
 }
@@ -2501,7 +2521,8 @@ const SQL_SHORTCUTS = [
   ['Run statement under cursor / selection', 'Ctrl+Enter'],
   ['Run all', 'Shift+Ctrl+Enter'],
   ['Prettify (selection or all)', 'Shift+Alt+F'],
-  ['Suggestions', 'Ctrl+Space'],
+  ['Suggestions / accept suggestion', 'Ctrl+Space / Tab, Enter'],
+  ['Save query', 'Ctrl+S'],
   ['Toggle line comment', 'Ctrl+/'],
   ['Move line up / down', 'Alt+↑ / Alt+↓'],
   ['Copy line up / down', 'Shift+Alt+↑ / Shift+Alt+↓'],
@@ -2532,7 +2553,10 @@ function sqlEditorFor(tab) {
     { key: 'Shift-Mod-Enter', run: () => { runSql(tab, 'all'); return true; } },
     { key: 'Shift-Alt-f', run: prettifySql, preventDefault: true },
     { key: 'Mod-l', run: CM.selectLine, preventDefault: true },
-    { key: 'Mod-s', run: () => { saveTabs(); toast('Saved in browser storage'); return true; }, preventDefault: true },
+    { key: 'Mod-s', run: () => { saveSqlTab(tab); return true; }, preventDefault: true },
+    // Tab accepts the selected suggestion (the first one by default), as in VS Code.
+    // Without an open list, Tab falls through to indentWithTab.
+    { key: 'Tab', run: CM.acceptCompletion },
   ]));
   tab.cm = new CM.EditorView({
     doc: tab.sql,
@@ -2552,7 +2576,7 @@ function sqlEditorFor(tab) {
       CM.indentUnit.of('  '),
       CM.bracketMatching(),
       CM.closeBrackets(),
-      CM.autocompletion({ override: [sqlCompletionSource], icons: true, maxRenderedOptions: 80 }),
+      CM.autocompletion({ override: [sqlCompletionSource], icons: true, maxRenderedOptions: 80, interactionDelay: 0 }),
       CM.highlightActiveLine(),
       CM.highlightSelectionMatches(),
       runKeys,
@@ -2594,6 +2618,7 @@ function renderSqlView(tab, root) {
       h('div', { class: 'split-btn' }, runBtn, runMore),
     ),
     h('div', { class: 'tb-group' },
+      saveQueryButtons(tab),
       h('button', { class: 'btn ghost', disabled: !history.length, onclick: (e) => openHistoryMenu(e.currentTarget, tab) }, icon('history'), 'History'),
       h('button', { class: 'icon-btn', title: 'Keyboard shortcuts', onclick: openShortcutsModal }, icon('keyboard', 16)),
     ),
@@ -2605,6 +2630,22 @@ function renderSqlView(tab, root) {
 
 let saveTimer = null;
 function saveTabsDebounced() { clearTimeout(saveTimer); saveTimer = setTimeout(saveTabs, 400); }
+
+/** "Save" (Ctrl+S) for a SQL tab; a linked tab also gets "Save as new". */
+function saveQueryButtons(tab) {
+  const linked = findSaved(tab.savedId);
+  const main = h('button', { class: 'btn ghost', title: linked ? `Update the saved query "${linked.name}"` : 'Save the query for later', onclick: () => saveSqlTab(tab) },
+    icon('bookmark', 14), 'Save', h('span', { class: 'kbd' }, 'Ctrl+S'));
+  if (!linked) return main;
+  return h('div', { class: 'split-btn' }, main,
+    h('button', {
+      class: 'btn ghost split-more-plain', title: 'More',
+      onclick: (e) => openMenu(e.currentTarget, [
+        h('div', { class: 'menu-item', onclick: () => { closeMenu(); saveSqlTab(tab, { asNew: true }); } }, icon('plus', 13), h('span', { class: 'menu-text' }, 'Save as new query…')),
+        h('div', { class: 'menu-item', onclick: () => { closeMenu(); renameSavedQuery(linked); } }, icon('edit', 13), h('span', { class: 'menu-text' }, 'Rename or change scope…')),
+      ]),
+    }, icon('chevron', 13)));
+}
 
 function openHistoryMenu(anchor, tab) {
   const history = store.get(`rs.history.${state.connId}`, []);
@@ -2675,8 +2716,16 @@ function renderSqlResults(tab) {
   const results = tab.results;
   if (!results.length) { box.append(h('div', { class: 'grid-empty' }, 'Query executed')); return box; }
   const res = results[Math.min(tab.activeResult, results.length - 1)];
-  const names = res.columns.map((c) => c.name);
-  const asJson = () => JSON.stringify(rowsToObjects(names, res.rows), null, 2);
+  // Hidden columns belong to this tab and this exact set of result columns (not to table settings).
+  // The same query run again keeps them; a result with other columns shows all columns.
+  // Copy and export use the visible columns.
+  const sig = res.columns.map((c) => c.name).join('\u0000');
+  const hidden = tab.resHidden?.sig === sig ? tab.resHidden.names : [];
+  const vis = res.columns.map((c, i) => i).filter((i) => !hidden.includes(res.columns[i].name));
+  const names = vis.map((i) => res.columns[i].name);
+  const visRows = () => (vis.length === res.columns.length ? res.rows : res.rows.map((r) => vis.map((i) => r[i])));
+  const asJson = () => JSON.stringify(rowsToObjects(names, visRows()), null, 2);
+  const nHidden = res.columns.length - vis.length;
   const mode = tab.resultView || 'table';
   const setMode = (m) => { tab.resultView = m; refreshView(tab); };
   const head = h('div', { class: 'res-head' },
@@ -2692,12 +2741,17 @@ function renderSqlResults(tab) {
       tab.duration != null ? ` · ${tab.duration.toFixed(1)} ms` : '',
       res.info ? ` · ${res.info}` : ''),
     h('span', { class: 'spacer' }),
-    res.columns.length ? h('button', { class: 'btn ghost sm', title: 'Copy all rows as JSON', onclick: () => { copyText(asJson()); toast('Copied'); } }, icon('copy', 13), 'Copy') : null,
-    res.columns.length ? h('button', { class: 'btn ghost sm', onclick: () => download('result.csv', toCSV(names, res.rows), 'text/csv') }, icon('download', 13), 'CSV') : null,
+    res.columns.length > 1 ? h('button', {
+      class: 'btn ghost sm', title: 'Show or hide columns',
+      onclick: (e) => columnsMenu(e.currentTarget, res.columns.map((c) => ({ name: c.name, type: c.type.toLowerCase() })), () => (tab.resHidden?.sig === sig ? tab.resHidden.names : []),
+        (list) => { tab.resHidden = { sig, names: list }; saveTabs(); refreshView(tab); }),
+    }, icon('columns', 13), 'Columns', nHidden ? h('span', { class: 'count' }, `${vis.length}/${res.columns.length}`) : null) : null,
+    res.columns.length ? h('button', { class: 'btn ghost sm', title: nHidden ? 'Copy all rows as JSON (visible columns)' : 'Copy all rows as JSON', onclick: () => { copyText(asJson()); toast('Copied'); } }, icon('copy', 13), 'Copy') : null,
+    res.columns.length ? h('button', { class: 'btn ghost sm', onclick: () => download('result.csv', toCSV(names, visRows()), 'text/csv') }, icon('download', 13), 'CSV') : null,
     res.columns.length ? h('button', { class: 'btn ghost sm', onclick: () => download('result.json', asJson(), 'application/json') }, icon('download', 13), 'JSON') : null,
   );
   box.append(head);
-  if (res.columns.length) box.append(mode === 'json' ? h('pre', { class: 'res-json mono', html: highlightJson(asJson()) }) : staticGrid(res));
+  if (res.columns.length) box.append(mode === 'json' ? h('pre', { class: 'res-json mono', html: highlightJson(asJson()) }) : staticGrid(res, vis));
   return box;
 }
 
@@ -2710,14 +2764,16 @@ function highlightJson(src) {
   });
 }
 
-function staticGrid(res) {
+/** A read-only grid of a SQL result. `vis` lists the indexes of the visible columns. */
+function staticGrid(res, vis = res.columns.map((c, i) => i)) {
   const cols = res.columns;
+  const shown = vis.map((i) => cols[i]);
   const table = h('table', { class: 'grid' },
-    h('colgroup', {}, h('col', { style: { width: '56px' } }), cols.map((c) => h('col', { style: { width: `${defaultWidth({ kind: c.kind, name: c.name })}px` } }))),
-    h('thead', {}, h('tr', {}, h('th', { class: 'rownum' }, '#'), cols.map((c) => h('th', { title: `${c.name} ${c.type}` },
+    h('colgroup', {}, h('col', { style: { width: '56px' } }), shown.map((c) => h('col', { style: { width: `${defaultWidth({ kind: c.kind, name: c.name })}px` } }))),
+    h('thead', {}, h('tr', {}, h('th', { class: 'rownum' }, '#'), shown.map((c) => h('th', { title: `${c.name} ${c.type}` },
       h('div', { class: 'th-inner' }, h('span', { class: 'th-name' }, c.name), h('span', { class: 'th-type' }, c.type.toLowerCase())))))),
     h('tbody', {}, res.rows.map((row, i) => h('tr', {}, h('td', { class: 'rownum' }, h('span', { class: 'rn' }, String(i + 1))),
-      row.map((v, ci) => { const d = displayValue(v, cols[ci]); return h('td', { class: `cell ro ${d.cls}`, dataset: { ci: String(ci) } }, h('span', { class: 'cell-text' }, d.text)); })))),
+      vis.map((ci) => { const d = displayValue(row[ci], cols[ci]); return h('td', { class: `cell ro ${d.cls}`, dataset: { ci: String(ci) } }, h('span', { class: 'cell-text' }, d.text)); })))),
   );
   const wrap = h('div', { class: 'grid-wrap', tabindex: '0' }, table);
   wrap.addEventListener('mousedown', (e) => {
@@ -3392,9 +3448,10 @@ function jsonlessSqlEditor(text, readOnly) {
     extensions: [
       CM.lineNumbers(), CM.history(), CM.drawSelection(), CM.bracketMatching(), CM.closeBrackets(), CM.highlightActiveLine(),
       CM.EditorView.lineWrapping, CM.EditorState.readOnly.of(readOnly),
-      CM.keymap.of([...CM.closeBracketsKeymap, ...CM.defaultKeymap, ...CM.searchKeymap, ...CM.historyKeymap, CM.indentWithTab]),
+      CM.Prec.highest(CM.keymap.of([{ key: 'Tab', run: CM.acceptCompletion }])),
+      CM.keymap.of([...CM.closeBracketsKeymap, ...CM.defaultKeymap, ...CM.searchKeymap, ...CM.historyKeymap, ...CM.completionKeymap, CM.indentWithTab]),
       CM.sql({ dialect: cmSqlDialect() }), sqlHighlighter,
-      CM.autocompletion({ override: [sqlCompletionSource], icons: true }),
+      CM.autocompletion({ override: [sqlCompletionSource], icons: true, interactionDelay: 0 }),
     ],
   });
 }
@@ -3629,10 +3686,158 @@ window.addEventListener('beforeunload', (e) => {
 });
 
 // Redis has its own sidebar and views (static/redis.js).
+// ---------------------------------------------------------------- saved queries
+// SQL statements and Redis commands kept on the server (saved-queries.json). A query belongs to
+// one connection, or to all connections with the same dialect (for DEV / PROD copies of one database).
+
+const queryKind = () => (isRedis() ? 'redis' : 'sql');
+
+async function loadSavedQueries() {
+  try { state.savedQueries = await api('/queries'); } catch { state.savedQueries = []; }
+}
+
+/** Saved queries for the current connection, sorted by name. */
+function visibleQueries() {
+  const d = state.schema?.dialect;
+  if (!d) return [];
+  return state.savedQueries
+    .filter((q) => q.kind === queryKind() && (q.connectionId ? q.connectionId === state.connId : q.dialect === d))
+    .sort((a, b) => a.name.localeCompare(b.name, undefined, { sensitivity: 'base' }));
+}
+
+const findSaved = (id) => (id ? state.savedQueries.find((q) => q.id === id) : null);
+
+/** A default name: the first non-comment line of the query, shortened. */
+function suggestQueryName(text) {
+  const line = text.split('\n').map((l) => l.trim()).find((l) => l && !l.startsWith('--') && !l.startsWith('#')) || 'Query';
+  return line.length > 60 ? line.slice(0, 57) + '…' : line;
+}
+
+/**
+ * Opens the dialog that creates a saved query (`text` given) or edits the name and scope of
+ * `existing`. Resolves with the saved query, or null when the user cancels.
+ */
+function openSaveQueryModal({ text = null, name = '', existing = null }) {
+  return new Promise((resolve) => {
+    const d = state.schema.dialect;
+    const nameF = fInput('Name', existing ? existing.name : name, { mono: false, placeholder: 'Active users' });
+    const shared = fCheck(`Show for all ${DIALECT_LABEL[d] || d} connections`, existing ? !existing.connectionId : false);
+    let done = false;
+    const finish = (v) => { if (!done) { done = true; resolve(v); } };
+    const submit = async () => {
+      const body = { name: nameF.el.value, connectionId: shared.el.checked ? '' : state.connId };
+      try {
+        const q = existing
+          ? await api(`/queries/${existing.id}`, { method: 'PATCH', body: { ...body, ...(text != null ? { text } : {}) } })
+          : await api('/queries', { body: { ...body, kind: queryKind(), text, dialect: d } });
+        state.savedQueries = [...state.savedQueries.filter((x) => x.id !== q.id), q];
+        finish(q);
+        close();
+        renderSidebar();
+      } catch (e) { toast(e.message, 'error'); nameF.el.focus(); }
+    };
+    nameF.el.addEventListener('keydown', (e) => { if (e.key === 'Enter') { e.preventDefault(); submit(); } });
+    const body = h('div', { class: 'form' }, nameF.wrap, shared.wrap,
+      h('div', { class: 'muted small' }, 'Off: only this connection shows the query.'),
+      text != null && !existing ? h('pre', { class: 'saved-preview mono' }, text.length > 600 ? text.slice(0, 600) + '…' : text) : null);
+    const close = openModal(existing ? 'Edit saved query' : 'Save query', body, [
+      h('button', { class: 'btn ghost', onclick: () => close() }, 'Cancel'),
+      h('button', { class: 'btn primary', onclick: submit }, icon('check', 13), existing ? 'Save' : 'Save query'),
+    ], { onClose: () => finish(null) });
+    setTimeout(() => { nameF.el.focus(); nameF.el.select(); }, 0);
+  });
+}
+
+async function deleteSavedQuery(q) {
+  if (!confirm(`Delete the saved query "${q.name}"?`)) return;
+  try {
+    await api(`/queries/${q.id}`, { method: 'DELETE' });
+    state.savedQueries = state.savedQueries.filter((x) => x.id !== q.id);
+    for (const t of state.tabs) if (t.savedId === q.id) t.savedId = null;
+    saveTabs();
+    renderSidebar();
+    if (activeTab()?.type === 'sql') renderMain();
+    toast('Query deleted');
+  } catch (e) { toast(e.message, 'error'); }
+}
+
+/** Saves the SQL tab: updates its saved query, or asks for a name (always when `asNew`). */
+async function saveSqlTab(tab, { asNew = false } = {}) {
+  const text = tab.cm ? tab.cm.state.doc.toString() : tab.sql;
+  if (!text.trim()) { toast('The editor is empty', 'error'); return; }
+  const linked = !asNew && findSaved(tab.savedId);
+  if (linked) {
+    try {
+      const q = await api(`/queries/${linked.id}`, { method: 'PATCH', body: { text } });
+      state.savedQueries = state.savedQueries.map((x) => (x.id === q.id ? q : x));
+      toast(`Saved "${q.name}"`, 'success');
+      renderSidebar();
+    } catch (e) { toast(e.message, 'error'); }
+    return;
+  }
+  const q = await openSaveQueryModal({ text, name: /^SQL \d+$/.test(tab.title) ? suggestQueryName(text) : tab.title });
+  if (!q) return;
+  tab.savedId = q.id;
+  tab.title = q.name;
+  saveTabs();
+  toast(`Saved "${q.name}"`, 'success');
+  if (tab.id === state.activeTab) renderMain();
+  renderSidebar();
+}
+
+/** Opens a saved query: SQL in its own tab (reused when open), Redis in the console. */
+function openSavedQuery(q) {
+  if (q.kind === 'redis') { R.insertCommand(q.text); return; }
+  let tab = state.tabs.find((t) => t.type === 'sql' && t.savedId === q.id);
+  if (!tab) {
+    tab = newSqlTab(q.name, q.text);
+    tab.savedId = q.id;
+    state.tabs.push(tab);
+  }
+  activate(tab.id);
+}
+
+function renameSavedQuery(q) {
+  openSaveQueryModal({ existing: q }).then((x) => {
+    if (!x) return;
+    for (const t of state.tabs) if (t.type === 'sql' && t.savedId === x.id) t.title = x.name;
+    saveTabs();
+    renderMain();
+  });
+}
+
+/** The "Saved queries" sidebar section. Hidden when there are none. */
+function renderSavedSection(sb) {
+  const list = visibleQueries();
+  if (!list.length) return;
+  const collapsed = store.get('rs.savedCollapsed', false);
+  const active = activeTab();
+  sb.append(h('button', {
+    class: 'sb-section sb-section-toggle', title: collapsed ? 'Show saved queries' : 'Hide saved queries',
+    onclick: () => { store.set('rs.savedCollapsed', !collapsed); renderSidebar(); },
+  }, h('span', {}, icon(collapsed ? 'right' : 'chevron', 11), 'Saved queries', h('span', { class: 'r-count' }, String(list.length)))));
+  if (collapsed) return;
+  const d = DIALECT_LABEL[state.schema.dialect] || state.schema.dialect;
+  sb.append(h('div', { class: 'saved-list' }, list.map((q) => h('div', {
+    class: `sb-item saved-item${active?.savedId === q.id ? ' active' : ''}`, role: 'button', tabindex: '0',
+    title: `${q.text.length > 400 ? q.text.slice(0, 400) + '…' : q.text}\n\n${q.connectionId ? 'This connection only' : `All ${d} connections`}`,
+    onclick: () => openSavedQuery(q),
+    onkeydown: (e) => { if (e.key === 'Enter') openSavedQuery(q); },
+  },
+  icon('bookmark', 14),
+  h('span', { class: 'sb-name' }, q.name),
+  q.connectionId ? null : h('span', { class: 'saved-shared', title: `Shared with all ${d} connections` }, icon('db', 11)),
+  h('span', { class: 'saved-actions' },
+    h('button', { class: 'icon-btn', title: 'Rename or change scope', onclick: (e) => { e.stopPropagation(); renameSavedQuery(q); } }, icon('edit', 12)),
+    h('button', { class: 'icon-btn', title: 'Delete', onclick: (e) => { e.stopPropagation(); deleteSavedQuery(q); } }, icon('trash', 12))),
+  ))));
+}
+
 const R = createRedisUI({
   h, icon, api, toast, state, store, openModal, openMenu, closeMenu, copyText, fmtNum, compact,
   jsonPane, looksLikeJsonText, reformatJson,
   conn, activeTab, activate, closeTab, saveTabs, renderSidebar, renderMain,
+  renderSavedSection, openSaveQueryModal, suggestQueryName, visibleQueries, openSavedQuery,
   nextTabId: () => tabSeq++, nextConsoleNo: () => sqlSeq++,
 });
 

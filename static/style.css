@@ -983,7 +983,9 @@ button.r-chip:disabled { cursor: default; }
 .r-text:focus { border-color: var(--border-strong); }
 .r-json { flex: 1; min-height: 0; display: flex; margin: 12px 12px 0; border: 1px solid var(--border); border-radius: var(--radius); overflow: hidden; }
 .r-json .json-pane { flex: 1; min-height: 0; display: flex; flex-direction: column; }
-.r-json .json-editor { flex: 1; min-height: 0; overflow: auto; }
+.r-json .json-editor { flex: 1; min-height: 0; display: flex; overflow: hidden; }
+/* The key view gives the editor the full height (the popover keeps its 520px cap). */
+.r-json .json-editor .cm-editor { flex: 1; height: 100%; max-height: none; }
 .r-actions { display: flex; align-items: center; gap: 8px; padding: 8px 12px; }
 .empty-main .r-actions { justify-content: center; }
 .r-note { margin: 12px 12px 0; padding: 8px 10px; border-radius: var(--radius); background: var(--mod-bg); color: var(--muted); font-size: 12px; }
@@ -1074,3 +1076,17 @@ body.conn-prod .conn-switch { border-color: color-mix(in srgb, var(--tag-prod) 5
 .menu-text b .menu-name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; min-width: 0; flex: 0 1 auto; }
 .menu-text b .tag-list { flex: none; }
 .conn-switch .conn-name { min-width: 40px; }
+
+/* ------------------------------------------------ Saved queries */
+.sb-section-toggle { width: 100%; border: 0; background: none; cursor: pointer; text-align: left; font: inherit; font-size: 11px; }
+.sb-section-toggle:hover { color: var(--text); }
+.sb-section-toggle > span { display: inline-flex; align-items: center; gap: 4px; }
+.saved-list { flex: 0 1 auto; max-height: 30vh; overflow-y: auto; padding: 0 6px 4px; }
+.saved-item { padding-right: 4px; }
+.saved-item .icon { flex: none; }
+.saved-shared { display: inline-flex; color: var(--dim); }
+.saved-actions { display: none; gap: 0; }
+.saved-item:hover .saved-actions, .saved-item:focus-within .saved-actions { display: inline-flex; }
+.saved-item:hover .saved-shared { display: none; }
+.saved-actions .icon-btn { width: 20px; height: 20px; }
+.saved-preview { margin: 0; max-height: 160px; overflow: auto; padding: 8px 10px; border: 1px solid var(--border); border-radius: var(--radius); background: var(--bg); font-size: 12px; white-space: pre-wrap; word-break: break-word; }

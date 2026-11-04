@@ -1,4 +1,4 @@
-Rowveil 0.4.1 adds **tags for connections** and fixes **Redis key search**.
+Rowveil 0.4.2 adds **saved queries** and **column visibility for SQL results**, and fixes autocomplete, the tag filter and the Redis JSON editor.
 
 ## Downloads
 
@@ -14,17 +14,17 @@ Rowveil 0.4.1 adds **tags for connections** and fixes **Redis key search**.
 
 ## What's new
 
-- **Connection tags.** Mark connections as `LOCAL`, `DEV`, `TEST`, `STAGE`, `PROD` or with your own tags (up to 8).
-  - Colored tags in the connection menu, and a tag filter at its top.
-  - Edit the name, tags and read-only flag of a saved connection (the ✎ button).
-  - A `PROD` connection gets a red line over the work area and `[PROD]` in the window title.
-  - Connections from environment variables: `DATABASE_TAGS_<NAME>=DEV,LOCAL`, or set the tags in the UI.
-- **Redis key search fixes.**
-  - The filter input keeps focus while keys load.
-  - Typing a new filter cancels the previous search instead of being ignored.
-  - On large databases the search continues by itself until it finds matches or reaches the end; each step scans more keys.
-  - A filter that names a key exactly (for example `cron:config`) shows that key at once.
-- **Updates.** Rowveil 0.4.0 offers this version through the **Update** button in the sidebar footer.
+- **Saved queries.** Keep SQL statements and Redis commands for later.
+  - `Ctrl+S` or the **Save** button in the SQL console and in the Redis console.
+  - A query belongs to one connection, or to all connections of the same dialect (for DEV / PROD copies of one database).
+  - The **Saved queries** section in the sidebar opens a query; hover it to rename or delete it.
+  - The queries are stored in `saved-queries.json` next to `connections.json`.
+- **Columns for SQL results.** Hide columns of a result with the **Columns** button. Copy, CSV and JSON use the visible columns. The setting belongs to the SQL tab and to that set of result columns.
+- **Fixes.**
+  - Autocomplete: `Tab` accepts the selected suggestion (the first one by default), as in VS Code. Without suggestions, `Tab` indents.
+  - Tag filter in the connection menu: a click shows only that tag (a second click clears the filter); `Ctrl+click` selects several tags; **All** shows all connections. Custom tags follow the preset tags.
+  - Redis: the JSON editor of a key fills the full height of the window.
+- **Updates.** Rowveil 0.4.0 and 0.4.1 offer this version through the **Update** button in the sidebar footer.
 
 ## Where your data is stored
 
@@ -34,7 +34,7 @@ Rowveil 0.4.1 adds **tags for connections** and fixes **Redis key search**.
 | macOS | `~/Library/Application Support/rowveil/` |
 | Linux | `~/.config/rowveil/` |
 
-The folder holds `connections.json` with your saved connections. Passwords are stored as plain text inside the connection URLs. It also holds `window.json`, `rowveil.log` and the `webview/` cache.
+The folder holds `connections.json` with your saved connections and `saved-queries.json` with your saved queries. Passwords are stored as plain text inside the connection URLs. It also holds `window.json`, `rowveil.log` and the `webview/` cache.
 
 ## Notes
 

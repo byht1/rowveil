@@ -33,8 +33,9 @@ Supports **PostgreSQL**, **MySQL / MariaDB**, **SQLite**, **Redis / Valkey** and
   - a ▶ button next to each statement runs only that statement; `Ctrl+Enter` runs the statement under the cursor or the selection; `Shift+Ctrl+Enter` runs everything;
   - Run menu: "Run all" and "Explain"; Prettify (`Shift+Alt+F`);
   - VS Code shortcuts: `Alt+↑/↓`, `Shift+Alt+↑/↓`, `Ctrl+D`, `Ctrl+Shift+L`, `Ctrl+/`, `Ctrl+Shift+K`, `Ctrl+L`, `Alt+Click`, `Ctrl+F` and more (the keyboard button in the toolbar lists them all);
-  - highlighting, autocomplete (tables, columns, aliases, keywords, dialect functions), line numbers, folding, history;
-  - results as a table or JSON, several result sets, copy, CSV / JSON export.
+  - highlighting, autocomplete (tables, columns, aliases, keywords, dialect functions; `Tab` or `Enter` accepts a suggestion), line numbers, folding, history;
+  - saved queries (`Ctrl+S`): for one connection or for all connections of the dialect, listed in the sidebar;
+  - results as a table or JSON, several result sets, hide columns, copy, CSV / JSON export.
 - CSV / JSON export (the current page or all filtered rows, up to 10,000).
 - Themes: Rowveil Light and Rowveil Dark (follows the system by default), Graphite, Paper, One Dark Pro, Dracula, Nord, GitHub Light (button at the bottom of the sidebar, preview on hover).
 - Read-only mode. Optional Basic Auth.
@@ -45,7 +46,7 @@ Supports **PostgreSQL**, **MySQL / MariaDB**, **SQLite**, **Redis / Valkey** and
 - Sidebar: database picker (`db0…db15` with key counts), glob filter (`user:*`; plain text matches anywhere in the key), type filter, a tree grouped by `:` or a flat list. Keys load with `SCAN` in batches, so a large Redis does not block.
 - View and edit by type: string (text or JSON editor), hash, list, set, sorted set, stream (entries, consumer groups), RedisJSON documents. Large collections load in pages (`HSCAN` / `SSCAN` / `LRANGE` / `ZRANGE`).
 - TTL (change or `PERSIST`), rename (`RENAMENX`), delete (`UNLINK`), new keys of any type.
-- A redis-cli style console: replies printed like redis-cli, `↑/↓` history, one command per line. A read-only connection runs read commands only.
+- A redis-cli style console: replies printed like redis-cli, `↑/↓` history, one command per line, saved commands (`Ctrl+S`). A read-only connection runs read commands only.
 
 ### BigQuery
 

@@ -1,12 +1,12 @@
-//! Roostbase server: serves the web UI in a browser (local use and Docker).
+//! Rowveil server: serves the web UI in a browser (local use and Docker).
 
 use clap::Parser;
-use roostbase::{default_data_dir, router, Options};
+use rowveil::{default_data_dir, router, Options};
 use std::net::SocketAddr;
 use std::path::PathBuf;
 
 #[derive(Parser, Debug)]
-#[command(name = "roostbase-server", version, about = "Roostbase: database explorer and query tool (web server)")]
+#[command(name = "rowveil-server", version, about = "Rowveil: database explorer and query tool (web server)")]
 struct Cli {
     /// Database URL to open on start (postgres://, mysql://, sqlite://).
     #[arg(long, env = "DATABASE_URL")]
@@ -38,7 +38,7 @@ struct Cli {
 async fn main() -> anyhow::Result<()> {
     tracing_subscriber::fmt()
         .with_env_filter(
-            tracing_subscriber::EnvFilter::try_from_default_env().unwrap_or_else(|_| "roostbase=info,warn".into()),
+            tracing_subscriber::EnvFilter::try_from_default_env().unwrap_or_else(|_| "rowveil=info,warn".into()),
         )
         .init();
     let cli = Cli::parse();
@@ -54,7 +54,7 @@ async fn main() -> anyhow::Result<()> {
     let listener = tokio::net::TcpListener::bind(addr).await?;
     let shown_host = if cli.host == "0.0.0.0" { "localhost" } else { cli.host.as_str() };
     let url = format!("http://{shown_host}:{}", cli.port);
-    println!("\n  Roostbase is running at {url}");
+    println!("\n  Rowveil is running at {url}");
     println!("  Saved connections: {}\n", store.display());
     if !cli.no_open {
         let _ = open::that_detached(&url);

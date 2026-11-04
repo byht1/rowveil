@@ -1,0 +1,10 @@
+<svg width="1180" height="260" viewBox="0 0 1180 260" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <rect width="1180" height="260" rx="28" fill="#0F172A"/>
+  <g transform="translate(20 10) scale(.5)">
+    <path d="M256 54 448 143 256 232 64 143 256 54Z" fill="#C4B5FD"/>
+    <path d="M256 167 448 256 256 345 64 256 256 167Z" fill="#818CF8"/>
+    <path d="M256 280 448 369 256 458 64 369 256 280Z" fill="#2DD4BF"/>
+  </g>
+  <text x="300" y="150" fill="#FFFFFF" font-family="Inter, Arial, sans-serif" font-size="112" font-weight="700">Rowveil</text>
+  <text x="306" y="210" fill="#CBD5E1" font-family="Inter, Arial, sans-serif" font-size="34" font-weight="400" letter-spacing="2">Explore  /  Query  /  Understand</text>
+</svg>

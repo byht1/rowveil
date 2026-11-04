@@ -1,21 +1,21 @@
-# Тестовий стенд Roostbase
+# Тестовий стенд Rowveil
 
-Три бази з однаковою предметною областю (організації, користувачі, замовлення). Дані покривають усі функції Roostbase.
+Три бази з однаковою предметною областю (організації, користувачі, замовлення). Дані покривають усі функції Rowveil.
 
 ## Запуск
 
-Усе разом — PostgreSQL, MySQL і Roostbase (веб) у Docker:
+Усе разом — PostgreSQL, MySQL і Rowveil (веб) у Docker:
 
 ```bash
 docker compose -f examples/testbed/docker-compose.yml up -d --build
 # відкрийте http://localhost:4984
 ```
 
-Тільки бази, для Roostbase, запущеного локально:
+Тільки бази, для Rowveil, запущеного локально:
 
 ```bash
 docker compose -f examples/testbed/docker-compose.yml up -d postgres mysql
-./target/release/roostbase.exe      # або roostbase-server
+./target/release/rowveil.exe      # або rowveil-server
 ```
 
 | База | URL |

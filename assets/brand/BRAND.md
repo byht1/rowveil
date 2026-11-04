@@ -1,52 +1,24 @@
-# Roostbase Brand Pack
+# Rowveil brand
 
-Ready-to-use assets for the Roostbase website, desktop app, PWA and social previews.
-
-## Recommended usage
-
-- **Main website header:** `logo/roostbase-horizontal-dark.svg` on a dark background or `roostbase-horizontal-light.svg` on a light background.
-- **App icon:** `icons/app/roostbase-512.png` or `roostbase-1024.png`.
-- **Favicon:** `icons/favicon/favicon.ico` plus 16/32/48 px PNGs.
-- **PWA:** `icons/app/icon-192.png`, `icons/app/icon-512.png` and `web/manifest.webmanifest`.
-- **Open Graph / social preview:** `social/roostbase-og-1200x630.png`.
-- **Design tokens:** `web/roostbase-tokens.css` and `brand/colors.json`.
-
-## Brand idea
-
-The mark combines three ideas:
-1. a **nest** = a safe, organized place for data;
-2. a **database cylinder** = storage/schema;
-3. a **terminal prompt** = querying and developer tooling.
-
-## Colors
+A developer data workspace for exploring, querying and understanding data — built on layers, rows and progressive reveal.
+Tagline: **Explore / Query / Understand**.
 
 | Token | Hex |
 |---|---|
-| Primary | `#8B5CF6` |
-| Primary light | `#A78BFA` |
-| Primary dark | `#6D28D9` |
-| Background | `#0B0B1A` |
-| Surface | `#151529` |
-| Accent | `#3B82F6` |
-| Success | `#22C55E` |
-| Warning | `#F59E0B` |
-| Error | `#EF4444` |
+| Indigo (primary) | `#4F46E5` |
+| Violet | `#8B5CF6` |
+| Lavender | `#C4B5FD` |
+| Teal | `#14B8A6` |
+| Slate | `#334155` |
+| Canvas | `#F4F6FA` |
+| Ink (text) | `#171B2F` |
 
-## Typography
+Typography: **Inter** (UI, brand), **JetBrains Mono** (code, queries, data).
 
-Use **Inter** where available. For native/desktop UI, the fallback stack in `roostbase-tokens.css` is recommended.
+Sources (vector masters) live in `static/brand/`:
 
-## Minimum logo guidance
+- `symbol.svg` — the layered-sheets symbol;
+- `app-icon.svg` — the app icon tile;
+- `logo-horizontal.svg`, `logo-horizontal-dark.svg` — lockups with the tagline.
 
-- Prefer SVG for web UI and high-DPI desktop surfaces.
-- Keep clear space around the logo roughly equal to the height of the terminal card inside the mark.
-- Avoid recoloring individual internal elements independently; use the supplied full-color or monochrome versions.
-- At very small sizes (16–32 px), use the symbol only, not the full wordmark.
-
-## Included files
-
-- `logo/` — symbol and wordmark variants in SVG + PNG.
-- `icons/` — application, PWA and favicon sizes.
-- `social/` — Open Graph/social card.
-- `brand/` — brand board and machine-readable colors.
-- `web/` — CSS tokens and PWA manifest.
+The favicon is `static/favicon.svg`. Raster icons (`assets/rowveil.ico`, `assets/icons/*.png`, `assets/window-icon-64.rgba`) are rendered from these SVGs: at 16–32 px the compact favicon symbol is used, from 48 px up the full app tile.

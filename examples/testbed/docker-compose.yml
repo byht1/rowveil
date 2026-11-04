@@ -1,9 +1,9 @@
-# Roostbase testbed: PostgreSQL + MySQL + SQLite with data for every Roostbase feature.
+# Rowveil testbed: PostgreSQL + MySQL + SQLite with data for every Rowveil feature.
 #
 #   docker compose -f examples/testbed/docker-compose.yml up -d --build
 #   open http://localhost:4984
 #
-# Only the databases (use them from a locally running Roostbase):
+# Only the databases (use them from a locally running Rowveil):
 #   docker compose -f examples/testbed/docker-compose.yml up -d postgres mysql
 #   postgres://postgres:postgres@localhost:54329/testbed
 #   mysql://root:root@localhost:13306/testbed
@@ -11,7 +11,7 @@
 #
 # Start from scratch (re-run the seed scripts):
 #   docker compose -f examples/testbed/docker-compose.yml down -v
-name: roostbase-testbed
+name: rowveil-testbed
 
 services:
   postgres:
@@ -45,9 +45,9 @@ services:
       interval: 3s
       retries: 60
 
-  roostbase:
+  rowveil:
     build: ../..
-    image: roostbase:latest
+    image: rowveil:latest
     ports:
       - "4984:4983"
     environment:
@@ -57,7 +57,7 @@ services:
       DATABASE_URL_PG_READER: postgres://app_reader:reader@postgres:5432/testbed
     volumes:
       - ./:/db            # the folder, so SQLite can create its journal next to the file
-      - roostbase-data:/data
+      - rowveil-data:/data
     depends_on:
       postgres:
         condition: service_healthy
@@ -67,4 +67,4 @@ services:
 volumes:
   pg-data:
   mysql-data:
-  roostbase-data:
+  rowveil-data:

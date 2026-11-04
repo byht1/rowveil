@@ -1,12 +1,12 @@
 [Desktop Entry]
 Type=Application
-Name=Roostbase
+Name=Rowveil
 GenericName=Database explorer
 Comment=Database explorer and query tool for PostgreSQL, MySQL and SQLite
-Exec=roostbase %f
-Icon=roostbase
+Exec=rowveil %f
+Icon=rowveil
 Terminal=false
 Categories=Development;Database;
 MimeType=application/vnd.sqlite3;application/x-sqlite3;
 Keywords=database;sql;postgres;postgresql;mysql;mariadb;sqlite;
-StartupWMClass=roostbase
+StartupWMClass=rowveil

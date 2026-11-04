@@ -1,12 +1,12 @@
 <!doctype html>
-<html lang="en" data-theme="roostbase">
+<html lang="en" data-theme="rowveil">
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>Roostbase</title>
+  <title>Rowveil</title>
   <link rel="icon" href="/favicon.svg" type="image/svg+xml">
   <link rel="alternate icon" href="/favicon.ico" sizes="16x16 32x32 48x48">
-  <meta name="theme-color" content="#8B5CF6">
+  <meta name="theme-color" content="#4F46E5">
   <link rel="stylesheet" href="/style.css">
   <script>
     // app.js stores the theme as JSON ("one-dark-pro" with quotes); also accept a plain value
@@ -14,8 +14,11 @@
       const raw = localStorage.getItem('rs.theme');
       let t = raw;
       try { t = JSON.parse(raw); } catch {}
-      if (t === 'querynest') t = 'roostbase'; else if (t === 'querynest-light') t = 'roostbase-light';
-      if (typeof t === 'string' && t) document.documentElement.dataset.theme = t;
+      const legacy = { querynest: 'rowveil', 'querynest-light': 'rowveil-light', roostbase: 'rowveil', 'roostbase-light': 'rowveil-light' };
+      if (legacy[t]) t = legacy[t];
+      // No saved choice: follow the system light / dark setting.
+      if (!t) t = matchMedia('(prefers-color-scheme: light)').matches ? 'rowveil-light' : 'rowveil';
+      if (typeof t === 'string') document.documentElement.dataset.theme = t;
     } catch {}
   </script>
 </head>

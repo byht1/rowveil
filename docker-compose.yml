@@ -1,9 +1,9 @@
-# Roostbase (web) + a demo PostgreSQL database.
+# Rowveil (web) + a demo PostgreSQL database.
 #   docker compose up -d --build   ->  open http://localhost:4983
 services:
-  roostbase:
+  rowveil:
     build: .
-    image: roostbase:latest
+    image: rowveil:latest
     ports:
       - "4983:4983"
     environment:
@@ -14,7 +14,7 @@ services:
       # Optional basic auth:
       # STUDIO_PASSWORD: change-me
     volumes:
-      - roostbase-data:/data            # saved connections
+      - rowveil-data:/data            # saved connections
       # - ./my.db:/db/my.db           # SQLite file -> DATABASE_URL_FILE: sqlite:///db/my.db
     extra_hosts:
       - "host.docker.internal:host-gateway"
@@ -35,4 +35,4 @@ services:
       retries: 20
 
 volumes:
-  roostbase-data:
+  rowveil-data:

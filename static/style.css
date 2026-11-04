@@ -595,93 +595,89 @@ select.input { padding-right: 4px; }
 .toast.hide { opacity: 0; transform: translateY(6px); }
 
 
-/* Roostbase brand themes (brand pack: assets/brand/colors.json) */
-:root[data-theme="roostbase"] {
-  --bg: #0b0b1a;
-  --panel: #10101f;
-  --panel-2: #151529;
-  --elev: #1a1a33;
-  --hover: #1e1b36;
-  --border: #23233f;
-  --border-strong: #34315a;
-  --text: #f8fafc;
-  --muted: #a6a7b5;
-  --dim: #6e6f88;
-  --accent: #8b5cf6;
+/* Rowveil brand themes (brand pack: assets/brand/colors.json) */
+:root[data-theme="rowveil"] {
+  --bg: #0b1020;
+  --panel: #0f1428;
+  --panel-2: #141a33;
+  --elev: #182040;
+  --hover: #1c2347;
+  --border: #222a4a;
+  --border-strong: #323b66;
+  --text: #f4f6fa;
+  --muted: #a3acc4;
+  --dim: #6b7493;
+  --accent: #6366f1;
   --accent-text: #ffffff;
-  --accent-soft: rgba(139, 92, 246, 0.16);
-  --danger: #ef4444;
-  --danger-soft: rgba(239, 68, 68, 0.14);
+  --accent-soft: rgba(99, 102, 241, 0.18);
+  --danger: #f87171;
+  --danger-soft: rgba(248, 113, 113, 0.13);
   --mod-bg: rgba(245, 158, 11, 0.13);
   --mod-border: rgba(245, 158, 11, 0.6);
-  --new-bg: rgba(34, 197, 94, 0.08);
-  --del-bg: rgba(239, 68, 68, 0.1);
-  --sel: #a78bfa;
-  --row-sel: rgba(139, 92, 246, 0.14);
+  --new-bg: rgba(45, 212, 191, 0.08);
+  --del-bg: rgba(248, 113, 113, 0.1);
+  --sel: #818cf8;
+  --row-sel: rgba(99, 102, 241, 0.14);
   --t-kw: #a78bfa;
-  --t-str: #86efac;
+  --t-str: #5eead4;
   --t-num: #fbbf24;
-  --t-com: #6b6b8a;
+  --t-com: #64708f;
   --t-id: #93c5fd;
-  --t-fn: #60a5fa;
+  --t-fn: #818cf8;
   --t-type: #f0abfc;
   --t-op: #c4b5fd;
   --t-param: #f472b6;
   --t-const: #fbbf24;
-  --t-punct: #8b8ba7;
-  --true: #22c55e;
-  --false: #ef4444;
-  --shadow: 0 12px 34px rgba(5, 5, 20, 0.6);
+  --t-punct: #8b93b5;
+  --true: #2dd4bf;
+  --false: #f87171;
+  --shadow: 0 12px 34px rgba(3, 6, 20, 0.6);
   color-scheme: dark;
 }
 
-:root[data-theme="roostbase-light"] {
+:root[data-theme="rowveil-light"] {
   --bg: #ffffff;
-  --panel: #faf9ff;
-  --panel-2: #f3f1fd;
+  --panel: #f8f9fc;
+  --panel-2: #f4f6fa;
   --elev: #ffffff;
-  --hover: #efebfd;
-  --border: #e6e2f6;
-  --border-strong: #d4cdee;
-  --text: #15132b;
-  --muted: #5d5a78;
-  --dim: #9692b3;
-  --accent: #7c3aed;
+  --hover: #eef0f8;
+  --border: #e3e7f0;
+  --border-strong: #cfd5e3;
+  --text: #171b2f;
+  --muted: #4b5468;
+  --dim: #8a93a8;
+  --accent: #4f46e5;
   --accent-text: #ffffff;
-  --accent-soft: rgba(124, 58, 237, 0.1);
+  --accent-soft: rgba(79, 70, 229, 0.09);
   --danger: #dc2626;
   --danger-soft: rgba(220, 38, 38, 0.08);
-  --mod-bg: rgba(245, 158, 11, 0.16);
+  --mod-bg: rgba(245, 158, 11, 0.15);
   --mod-border: rgba(217, 119, 6, 0.7);
-  --new-bg: rgba(22, 163, 74, 0.07);
+  --new-bg: rgba(20, 184, 166, 0.08);
   --del-bg: rgba(220, 38, 38, 0.07);
-  --sel: #7c3aed;
-  --row-sel: rgba(124, 58, 237, 0.08);
+  --sel: #4f46e5;
+  --row-sel: rgba(79, 70, 229, 0.07);
   --t-kw: #6d28d9;
-  --t-str: #15803d;
+  --t-str: #0f766e;
   --t-num: #c2410c;
-  --t-com: #9ca3af;
+  --t-com: #94a3b8;
   --t-id: #1d4ed8;
-  --t-fn: #2563eb;
+  --t-fn: #4f46e5;
   --t-type: #a21caf;
   --t-op: #64748b;
   --t-param: #be123c;
   --t-const: #c2410c;
   --t-punct: #94a3b8;
-  --true: #16a34a;
+  --true: #0d9488;
   --false: #dc2626;
-  --shadow: 0 10px 30px rgba(40, 20, 90, 0.12);
+  --shadow: 0 10px 30px rgba(23, 27, 47, 0.12);
   color-scheme: light;
 }
 
 /* brand mark */
 .brand .brand-mark { width: 18px; height: 18px; flex: none; }
 .brand .brand-name { font-weight: 700; letter-spacing: -0.01em; }
-.brand-accent, .welcome-title .brand-accent {
-  background: linear-gradient(135deg, #a78bfa, #7c3aed);
-  -webkit-background-clip: text; background-clip: text; color: transparent;
-}
-.welcome-title { font-size: 30px; font-weight: 800; letter-spacing: -0.02em; margin: 6px 0 0; }
+.welcome-title { font-size: 30px; font-weight: 800; letter-spacing: -0.02em; margin: 6px 0 0; color: var(--text); }
 .welcome-tag { color: var(--muted); margin: 0 0 6px; }
 
 /* ------------------------------------------------ SQL console */

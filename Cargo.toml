@@ -1,28 +1,28 @@
 [package]
-name = "roostbase"
+name = "rowveil"
 version = "0.3.0"
 edition = "2021"
-description = "Roostbase: database explorer and query tool for PostgreSQL, MySQL and SQLite"
+description = "Rowveil: database explorer and query tool for PostgreSQL, MySQL and SQLite"
 license = "MIT"
-default-run = "roostbase"
-repository = "https://github.com/byht1/roostbase"
-homepage = "https://byht1.github.io/roostbase/"
+default-run = "rowveil"
+repository = "https://github.com/byht1/rowveil"
+homepage = "https://byht1.github.io/rowveil/"
 readme = "README.md"
 keywords = ["database", "sql", "postgresql", "mysql", "sqlite"]
 
 [lib]
-name = "roostbase"
+name = "rowveil"
 path = "src/lib.rs"
 
 # Desktop app: its own window (WebView2 on Windows), no console, no browser.
 [[bin]]
-name = "roostbase"
+name = "rowveil"
 path = "src/bin/desktop.rs"
 required-features = ["desktop"]
 
 # Web server: the UI in a browser; used by Docker.
 [[bin]]
-name = "roostbase-server"
+name = "rowveil-server"
 path = "src/main.rs"
 
 [features]

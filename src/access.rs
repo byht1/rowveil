@@ -34,7 +34,7 @@ pub fn write_blockers(db: &Path) -> Vec<PathBuf> {
 }
 
 fn dir_allows_new_files(dir: &Path) -> bool {
-    let probe = dir.join(format!(".roostbase-probe-{}", std::process::id()));
+    let probe = dir.join(format!(".rowveil-probe-{}", std::process::id()));
     match std::fs::OpenOptions::new().write(true).create_new(true).open(&probe) {
         Ok(f) => {
             drop(f);
@@ -58,7 +58,7 @@ pub async fn grant_write(paths: &[PathBuf]) -> Result<()> {
         return Ok(());
     }
     // Resolve the SID in the non-elevated process: the elevated process can run under a
-    // different admin account, and the grant must go to the user who runs Roostbase.
+    // different admin account, and the grant must go to the user who runs Rowveil.
     // Full path: a `whoami` from Git Bash / MSYS on PATH does not understand these flags.
     let system32 = PathBuf::from(std::env::var_os("SystemRoot").unwrap_or_else(|| "C:\\Windows".into())).join("System32");
     let out = Command::new(system32.join("whoami.exe"))
@@ -83,7 +83,7 @@ pub async fn grant_write(paths: &[PathBuf]) -> Result<()> {
         script.push_str(&format!("icacls \"{path}\" /grant *{sid}:{rights} /C /Q >nul || exit /b 1\r\n"));
     }
     script.push_str("exit /b 0\r\n");
-    let script_path = std::env::temp_dir().join(format!("roostbase-grant-{}.cmd", uuid::Uuid::new_v4()));
+    let script_path = std::env::temp_dir().join(format!("rowveil-grant-{}.cmd", uuid::Uuid::new_v4()));
     tokio::fs::write(&script_path, script).await.context("cannot write the helper script")?;
 
     let ps = format!(

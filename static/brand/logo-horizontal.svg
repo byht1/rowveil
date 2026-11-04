@@ -1,0 +1,14 @@
+<svg width="1180" height="260" viewBox="0 0 1180 260" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <linearGradient id="top" x1="40" y1="25" x2="210" y2="120" gradientUnits="userSpaceOnUse"><stop stop-color="#C4B5FD"/><stop offset="1" stop-color="#8B5CF6"/></linearGradient>
+    <linearGradient id="mid" x1="30" y1="95" x2="220" y2="165" gradientUnits="userSpaceOnUse"><stop stop-color="#7C3AED"/><stop offset="1" stop-color="#4F46E5"/></linearGradient>
+    <linearGradient id="bot" x1="38" y1="165" x2="215" y2="225" gradientUnits="userSpaceOnUse"><stop stop-color="#67E8F9"/><stop offset="1" stop-color="#14B8A6"/></linearGradient>
+  </defs>
+  <g transform="translate(20 10) scale(.5)">
+    <path d="M256 54 448 143 256 232 64 143 256 54Z" fill="url(#top)"/>
+    <path d="M256 167 448 256 256 345 64 256 256 167Z" fill="url(#mid)"/>
+    <path d="M256 280 448 369 256 458 64 369 256 280Z" fill="url(#bot)"/>
+  </g>
+  <text x="300" y="150" fill="#171B2F" font-family="Inter, Arial, sans-serif" font-size="112" font-weight="700">Rowveil</text>
+  <text x="306" y="210" fill="#6B7280" font-family="Inter, Arial, sans-serif" font-size="34" font-weight="400" letter-spacing="2">Explore  /  Query  /  Understand</text>
+</svg>

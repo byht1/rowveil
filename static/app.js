@@ -1,6 +1,6 @@
 import * as CM from '/vendor/codemirror.js';
 
-// Roostbase — single-page UI (no build step).
+// Rowveil — single-page UI (no build step).
 
 // ---------------------------------------------------------------- helpers
 const $ = (sel, root = document) => root.querySelector(sel);
@@ -94,7 +94,7 @@ async function api(path, { method, body } = {}) {
       body: body !== undefined ? JSON.stringify(body) : undefined,
     });
   } catch {
-    throw new Error(state.info?.desktop ? 'The Roostbase engine stopped. Restart the app.' : `Cannot reach the Roostbase server at ${location.host}. It may have stopped: start it again and reload the page.`);
+    throw new Error(state.info?.desktop ? 'The Rowveil engine stopped. Restart the app.' : `Cannot reach the Rowveil server at ${location.host}. It may have stopped: start it again and reload the page.`);
   }
   const text = await res.text();
   let data = null;
@@ -265,7 +265,7 @@ async function selectConnection(id, refresh = false) {
   store.set('rs.conn', id);
   if (hashConn() !== id) history.replaceState(null, '', connUrl(id));
   const c = state.connections.find((x) => x.id === id);
-  document.title = c ? `${c.name} — Roostbase` : 'Roostbase';
+  document.title = c ? `${c.name} — Rowveil` : 'Rowveil';
   state.schema = null;
   state.schemaError = null;
   state.loadingSchema = true;
@@ -416,8 +416,8 @@ function compact(n) {
 // Each theme is a set of CSS variables in style.css under :root[data-theme="<id>"].
 // The swatch shows background, accent, keyword and string colors.
 const THEMES = [
-  { id: 'roostbase', name: 'Roostbase', swatch: ['#0b0b1a', '#8b5cf6', '#a78bfa', '#86efac'] },
-  { id: 'roostbase-light', name: 'Roostbase Light', swatch: ['#ffffff', '#7c3aed', '#6d28d9', '#15803d'] },
+  { id: 'rowveil-light', name: 'Rowveil Light', swatch: ['#ffffff', '#4f46e5', '#8b5cf6', '#14b8a6'] },
+  { id: 'rowveil', name: 'Rowveil Dark', swatch: ['#0b1020', '#6366f1', '#a78bfa', '#2dd4bf'] },
   { id: 'dark', name: 'Graphite', swatch: ['#0b0b0b', '#c5f74f', '#c792ea', '#c3e88d'] },
   { id: 'light', name: 'Paper', swatch: ['#ffffff', '#1f2937', '#7c3aed', '#15803d'] },
   { id: 'one-dark-pro', name: 'One Dark Pro', swatch: ['#282c34', '#61afef', '#c678dd', '#98c379'] },
@@ -434,10 +434,12 @@ function setTheme(id) {
 // Re-apply the saved theme in app.js too, and fall back to the default for an unknown value.
 {
   // Theme ids of the app's earlier name map to the same themes.
-  const legacy = { querynest: 'roostbase', 'querynest-light': 'roostbase-light' };
-  const raw = store.get('rs.theme', 'roostbase');
+  const legacy = { querynest: 'rowveil', 'querynest-light': 'rowveil-light', roostbase: 'rowveil', 'roostbase-light': 'rowveil-light' };
+  // No saved choice: follow the system light / dark setting.
+  const fallback = window.matchMedia?.('(prefers-color-scheme: light)').matches ? 'rowveil-light' : 'rowveil';
+  const raw = store.get('rs.theme', fallback);
   const saved = legacy[raw] || raw;
-  document.documentElement.dataset.theme = THEMES.some((t) => t.id === saved) ? saved : 'roostbase';
+  document.documentElement.dataset.theme = THEMES.some((t) => t.id === saved) ? saved : fallback;
 }
 
 function openThemeMenu(anchor) {
@@ -463,7 +465,7 @@ function openThemeMenu(anchor) {
 function sidebarFooter() {
   const theme = THEMES.find((t) => t.id === document.documentElement.dataset.theme) || THEMES[0];
   return h('div', { class: 'sb-foot' },
-    h('span', { class: 'brand' }, h('img', { class: 'brand-mark', src: '/brand/symbol.svg', alt: '' }), h('span', { class: 'brand-name' }, 'Roost', h('span', { class: 'brand-accent' }, 'base')), h('span', { class: 'ver' }, state.info ? `v${state.info.version}` : '')),
+    h('span', { class: 'brand' }, h('img', { class: 'brand-mark', src: '/brand/symbol.svg', alt: '' }), h('span', { class: 'brand-name' }, 'Rowveil'), h('span', { class: 'ver' }, state.info ? `v${state.info.version}` : '')),
     h('button', { class: 'btn ghost sm', title: 'Theme', onclick: (e) => openThemeMenu(e.currentTarget) },
       icon('palette', 14), h('span', { class: 'theme-name' }, theme.name)),
   );
@@ -709,7 +711,7 @@ function openConnectionModal() {
   );
   const sqliteBox = h('div', { class: 'form' },
     h('label', {}, 'Database file', file),
-    h('div', { class: 'hint' }, h('div', {}, 'Full path to an existing ', h('code', {}, '.db'), ' / ', h('code', {}, '.sqlite'), ' file on the machine where Roostbase runs.')),
+    h('div', { class: 'hint' }, h('div', {}, 'Full path to an existing ', h('code', {}, '.db'), ' / ', h('code', {}, '.sqlite'), ' file on the machine where Rowveil runs.')),
   );
   const fieldsPane = h('div', { class: 'form' }, h('label', {}, 'Database type', typeSeg), serverBox, sqliteBox, h('label', {}, 'Connection URL', preview));
 
@@ -838,7 +840,7 @@ function renderMain() {
 function welcome() {
   return h('div', { class: 'empty-main' },
     h('img', { src: '/brand/symbol.svg', width: 96, height: 96, alt: '' }),
-    h('h2', { class: 'welcome-title' }, 'Roost', h('span', { class: 'brand-accent' }, 'base')),
+    h('h2', { class: 'welcome-title' }, 'Rowveil'),
     h('p', { class: 'welcome-tag' }, 'Database explorer & query tool'),
     h('p', { class: 'muted' }, 'Browse and edit PostgreSQL, MySQL and SQLite databases.'),
     h('button', { class: 'btn primary', onclick: openConnectionModal }, icon('plus'), 'Add connection'),

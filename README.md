@@ -1,6 +1,6 @@
-<p align="center"><img src="static/brand/symbol.svg" width="120" alt="Roostbase"></p>
+<p align="center"><img src="static/brand/logo-horizontal.svg" width="520" alt="Rowveil — Explore / Query / Understand"></p>
 
-# Roostbase
+# Rowveil
 
 Database explorer & query tool. Окремий десктопний застосунок для перегляду, редагування й керування структурою баз даних.
 Бекенд на Rust (axum + sqlx), UI — vanilla JS, вбудований у бінарник. Жодних ORM чи конфігів проєкту не потрібно.
@@ -33,37 +33,37 @@ Database explorer & query tool. Окремий десктопний застос
   - підсвітка, автокомпліт (таблиці, колонки, alias-и, ключові слова, функції діалекту), номери рядків, згортання блоків, історія;
   - результати таблицею або JSON, кілька результатів, копіювання, експорт CSV / JSON.
 - Експорт у CSV / JSON (поточна сторінка або всі відфільтровані рядки, до 10 000).
-- Теми: Roostbase (за замовчуванням), Roostbase Light, Graphite, Paper, One Dark Pro, Dracula, Nord, GitHub Light (кнопка внизу сайдбару, прев'ю при наведенні).
+- Теми: Rowveil Light і Rowveil Dark (за замовчуванням — як у системі), Graphite, Paper, One Dark Pro, Dracula, Nord, GitHub Light (кнопка внизу сайдбару, прев'ю при наведенні).
 - Режим read-only. Опційний Basic Auth.
 
 ## Встановлення
 
-Готові збірки — на сторінці [Releases](https://github.com/byht1/roostbase/releases/latest) і на [сайті](https://byht1.github.io/roostbase/#downloads).
+Готові збірки — на сторінці [Releases](https://github.com/byht1/rowveil/releases/latest) і на [сайті](https://byht1.github.io/rowveil/#downloads).
 
 | Система | Файл | Як встановити |
 |---|---|---|
-| Windows 10/11 | `Roostbase-Setup-x64.msi` | Інсталятор: папка, ярлики, «Відкрити за допомогою» для `.db`, сторінка «де що зберігається» |
-| Windows | `roostbase.exe` | Portable: один файл без встановлення |
-| macOS 11+ | `Roostbase-macOS-universal.dmg` | Перетягніть Roostbase у Applications. Перший запуск: правий клік → Open |
-| Debian / Ubuntu | `roostbase-linux-amd64.deb` | `sudo apt install ./roostbase-linux-amd64.deb` |
-| Інший Linux | `roostbase-linux-x86_64.tar.gz` | Потрібні WebKitGTK 4.1 і GTK 3 (див. `README.txt` в архіві) |
+| Windows 10/11 | `Rowveil-Setup-x64.msi` | Інсталятор: папка, ярлики, «Відкрити за допомогою» для `.db`, сторінка «де що зберігається» |
+| Windows | `rowveil.exe` | Portable: один файл без встановлення |
+| macOS 11+ | `Rowveil-macOS-universal.dmg` | Перетягніть Rowveil у Applications. Перший запуск: правий клік → Open |
+| Debian / Ubuntu | `rowveil-linux-amd64.deb` | `sudo apt install ./rowveil-linux-amd64.deb` |
+| Інший Linux | `rowveil-linux-x86_64.tar.gz` | Потрібні WebKitGTK 4.1 і GTK 3 (див. `README.txt` в архіві) |
 
-Де зберігаються дані (`connections.json` — підключення, паролі в URL відкритим текстом; `window.json`; `roostbase.log`; `webview/`):
+Де зберігаються дані (`connections.json` — підключення, паролі в URL відкритим текстом; `window.json`; `rowveil.log`; `webview/`):
 
 | Система | Папка |
 |---|---|
-| Windows | `%APPDATA%\roostbase\` |
-| macOS | `~/Library/Application Support/roostbase/` |
-| Linux | `~/.config/roostbase/` |
+| Windows | `%APPDATA%\rowveil\` |
+| macOS | `~/Library/Application Support/rowveil/` |
+| Linux | `~/.config/rowveil/` |
 
 Видалення програми папку з даними не чіпає.
 
 ## Десктопний застосунок
 
-- Власне вікно з іконкою Roostbase, без консолі й браузера. Рушій: WebView2 (Windows), WKWebView (macOS), WebKitGTK (Linux).
+- Власне вікно з іконкою Rowveil, без консолі й браузера. Рушій: WebView2 (Windows), WKWebView (macOS), WebKitGTK (Linux).
 - Кожне підключення можна відкрити в окремому вікні. Розмір і позиція головного вікна запам'ятовуються.
 - Експорт CSV / JSON відкриває системний діалог «Зберегти як»; після збереження — «Show in folder».
-- Базу можна передати аргументом: `roostbase C:\data\app.db` або `roostbase postgres://user:pass@host/db`.
+- Базу можна передати аргументом: `rowveil C:\data\app.db` або `rowveil postgres://user:pass@host/db`.
 - Сервер усередині застосунку слухає лише `127.0.0.1` на випадковому порту й приймає запити тільки від свого вікна (секретний токен на кожен запуск).
 
 ### Збірка з вихідного коду
@@ -77,16 +77,16 @@ sudo apt install libwebkit2gtk-4.1-dev libgtk-3-dev && cargo build --release   #
 
 ## Браузерна версія і Docker
 
-`roostbase-server` — той самий інтерфейс у браузері. Для Docker і для доступу з інших машин.
+`rowveil-server` — той самий інтерфейс у браузері. Для Docker і для доступу з інших машин.
 
 ```bash
-./target/release/roostbase-server --url postgres://user:pass@localhost:5432/db
+./target/release/rowveil-server --url postgres://user:pass@localhost:5432/db
 # відкриється http://127.0.0.1:4983
 ```
 
 ```bash
-docker build -t roostbase .
-docker run -p 4983:4983 -v roostbase-data:/data   -e DATABASE_URL=postgres://user:pass@host.docker.internal:5432/db   --add-host host.docker.internal:host-gateway   roostbase
+docker build -t rowveil .
+docker run -p 4983:4983 -v rowveil-data:/data   -e DATABASE_URL=postgres://user:pass@host.docker.internal:5432/db   --add-host host.docker.internal:host-gateway   rowveil
 ```
 
 Демо з тестовою базою PostgreSQL:
@@ -113,10 +113,10 @@ docker compose -f examples/testbed/docker-compose.yml up -d --build
 |---|---|---|
 | `DATABASE_URL` / `--url` | Основне підключення (у десктопі — аргумент) | — |
 | `DATABASE_URL_<NAME>` | Додаткові підключення (назва = `<name>`) | — |
-| `STUDIO_HOST` / `--host` | Адреса (лише `roostbase-server`) | `127.0.0.1` (Docker: `0.0.0.0`) |
-| `STUDIO_PORT` / `--port` | Порт (лише `roostbase-server`) | `4983` |
-| `STUDIO_DATA_DIR` / `--data-dir` | Папка для `connections.json` | `%APPDATA%\roostbase` (Docker: `/data`) |
-| `STUDIO_NO_OPEN` / `--no-open` | Не відкривати браузер (лише `roostbase-server`) | `false` |
+| `STUDIO_HOST` / `--host` | Адреса (лише `rowveil-server`) | `127.0.0.1` (Docker: `0.0.0.0`) |
+| `STUDIO_PORT` / `--port` | Порт (лише `rowveil-server`) | `4983` |
+| `STUDIO_DATA_DIR` / `--data-dir` | Папка для `connections.json` | `%APPDATA%\rowveil` (Docker: `/data`) |
+| `STUDIO_NO_OPEN` / `--no-open` | Не відкривати браузер (лише `rowveil-server`) | `false` |
 | `STUDIO_READ_ONLY` / `--read-only` | Заборонити зміни даних | `false` |
 | `STUDIO_PASSWORD` / `--password` | Увімкнути Basic Auth | — |
 | `STUDIO_USER` / `--user` | Логін Basic Auth | `admin` |
@@ -141,12 +141,12 @@ sqlite://./data.db                  (або шлях до файлу .db / .sqli
 ```bash
 cargo test
 cargo run -- examples/testbed/testbed.db                                   # десктоп
-cargo run --bin roostbase-server -- --url sqlite://examples/testbed/testbed.db  # браузер
+cargo run --bin rowveil-server -- --url sqlite://examples/testbed/testbed.db  # браузер
 ```
 
-Структура: `src/lib.rs` — сервер і API, `src/main.rs` — `roostbase-server`, `src/bin/desktop.rs` — десктопне вікно (tao + wry), `build.rs` — іконка й метадані `.exe`. Без десктопу (Linux / Docker): `cargo build --no-default-features --bin roostbase-server`.
+Структура: `src/lib.rs` — сервер і API, `src/main.rs` — `rowveil-server`, `src/bin/desktop.rs` — десктопне вікно (tao + wry), `build.rs` — іконка й метадані `.exe`. Без десктопу (Linux / Docker): `cargo build --no-default-features --bin rowveil-server`.
 
-Бренд: `assets/brand/` (кольори, гайд), `assets/roostbase.ico`, `static/brand/`.
+Бренд: `assets/brand/` (кольори, гайд), `assets/rowveil.ico`, `static/brand/`.
 
 У debug-збірці файли зі `static/` читаються з диска, тож зміни UI видно після перезавантаження сторінки.
 

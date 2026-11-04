@@ -86,15 +86,17 @@ const store = {
   },
 };
 
-async function api(path, { method, body } = {}) {
+async function api(path, { method, body, signal } = {}) {
   let res;
   try {
     res = await fetch('/api' + path, {
       method: method || (body !== undefined ? 'POST' : 'GET'),
       headers: body !== undefined ? { 'content-type': 'application/json' } : {},
       body: body !== undefined ? JSON.stringify(body) : undefined,
+      signal,
     });
-  } catch {
+  } catch (e) {
+    if (e?.name === 'AbortError') throw e;
     throw new Error(state.info?.desktop ? 'The Rowveil engine stopped. Restart the app.' : `Cannot reach the Rowveil server at ${location.host}. It may have stopped: start it again and reload the page.`);
   }
   const text = await res.text();
@@ -432,6 +434,9 @@ async function grantWriteAccess(btn) {
 }
 
 function render() {
+  const c = conn();
+  document.body.classList.toggle('conn-prod', isProd(c));
+  if (c) document.title = `${isProd(c) ? '[PROD] ' : ''}${c.name} — Rowveil`;
   renderSidebar();
   renderMain();
 }
@@ -439,14 +444,22 @@ function render() {
 // ---------------------------------------------------------------- sidebar
 function renderSidebar() {
   const sb = $('#sidebar');
+  // Rebuilding replaces the inputs: keep the focused one (search fields) and its caret.
+  const active = sb.contains(document.activeElement) && document.activeElement.matches('input:not([type="checkbox"])') ? document.activeElement : null;
+  const restore = active && { cls: active.className, start: active.selectionStart, end: active.selectionEnd };
   sb.replaceChildren();
+  if (restore) queueMicrotask(() => {
+    const el = [...sb.querySelectorAll('input')].find((x) => x.className === restore.cls);
+    if (el) { el.focus({ preventScroll: true }); try { el.setSelectionRange(restore.start, restore.end); } catch { /* not a text input */ } }
+  });
   const c = conn();
 
   // Connection switcher
   const switcher = h('button', { class: 'conn-switch', onclick: (e) => openConnMenu(e.currentTarget) },
     h('span', { class: `dialect-dot ${c?.dialect || ''}` }),
     h('span', { class: 'conn-name' }, c ? c.name : 'No connection'),
-    c ? h('span', { class: 'conn-dialect' }, DIALECT_LABEL[c.dialect] || '') : null,
+    c ? tagChips(c, 1) : null,
+    c && !c.tags?.length ? h('span', { class: 'conn-dialect' }, DIALECT_LABEL[c.dialect] || '') : null,
     icon('chevron', 14),
   );
   sb.append(h('div', { class: 'sb-head' }, switcher));
@@ -594,8 +607,114 @@ function sidebarFooter() {
   );
 }
 
+// ---------------------------------------------------------------- connection tags
+const TAG_PRESETS = ['LOCAL', 'DEV', 'TEST', 'STAGE', 'PROD'];
+function tagTone(t) {
+  const u = String(t).toUpperCase();
+  if (/^(PROD|PRODUCTION|PRD|LIVE)$/.test(u)) return 'prod';
+  if (/^(STAGE|STAGING|STG|PREPROD|PRE-PROD|UAT)$/.test(u)) return 'stage';
+  if (/^(DEV|DEVELOP|DEVELOPMENT)$/.test(u)) return 'dev';
+  if (/^(LOCAL|LOCALHOST)$/.test(u)) return 'local';
+  if (/^(TEST|TESTING|QA|CI)$/.test(u)) return 'test';
+  return 'other';
+}
+const tagChip = (t) => h('span', { class: `tag-chip tone-${tagTone(t)}` }, t);
+const tagChips = (c, max = 8) => {
+  const tags = c?.tags || [];
+  if (!tags.length) return null;
+  return h('span', { class: 'tag-list' }, tags.slice(0, max).map(tagChip), tags.length > max ? h('span', { class: 'tag-more' }, `+${tags.length - max}`) : null);
+};
+const isProd = (c) => (c?.tags || []).some((t) => tagTone(t) === 'prod');
+const cleanTag = (s) => s.trim().replace(/[^\p{L}\p{N}\-_. ]/gu, '').slice(0, 24).trim().toUpperCase();
+
+/** Preset toggles (LOCAL, DEV, …) plus free-form tags. */
+function tagEditor(initial = []) {
+  let tags = [...initial];
+  // Redrawing detaches the input, which fires "blur": ignore that one.
+  let drawing = false;
+  const box = h('div', { class: 'tag-editor' });
+  const input = h('input', {
+    class: 'tag-input', placeholder: 'Add tag…', maxlength: 24,
+    onkeydown: (e) => {
+      if ((e.key === 'Enter' || e.key === ',') && input.value.trim()) { e.preventDefault(); e.stopPropagation(); add(input.value); input.value = ''; input.focus(); }
+      else if (e.key === 'Backspace' && !input.value && tags.length) { tags.pop(); draw(); input.focus(); }
+    },
+    onblur: () => { if (!drawing && input.value.trim()) { add(input.value); input.value = ''; } },
+  });
+  const add = (raw) => {
+    for (const part of raw.split(/[,|;]/)) {
+      const t = cleanTag(part);
+      if (t && !tags.includes(t) && tags.length < 8) tags.push(t);
+    }
+    draw();
+  };
+  const toggle = (t) => { tags = tags.includes(t) ? tags.filter((x) => x !== t) : [...tags, t]; draw(); };
+  const draw = () => {
+    drawing = true;
+    const custom = tags.filter((t) => !TAG_PRESETS.includes(t));
+    box.replaceChildren(
+      h('div', { class: 'tag-presets' }, TAG_PRESETS.map((t) => h('button', {
+        type: 'button', class: `tag-chip tone-${tagTone(t)} toggle${tags.includes(t) ? ' on' : ''}`, onclick: () => toggle(t),
+      }, t))),
+      h('div', { class: 'tag-custom' },
+        custom.map((t) => h('span', { class: `tag-chip tone-${tagTone(t)}` }, t,
+          h('button', { type: 'button', class: 'tag-x', title: 'Remove', onclick: () => toggle(t) }, '×'))),
+        input),
+    );
+    drawing = false;
+  };
+  draw();
+  return { dom: box, value: () => { if (input.value.trim()) { add(input.value); input.value = ''; } return tags; } };
+}
+
+function openEditConnection(c) {
+  const env = c.source === 'env';
+  const name = h('input', { class: 'input', value: c.name, disabled: env });
+  const ro = h('input', { type: 'checkbox', checked: c.readOnly, disabled: env || state.info?.readOnly });
+  const tags = tagEditor(c.tags || []);
+  const status = h('div', { class: 'form-status' });
+  const body = h('div', { class: 'form' },
+    h('label', {}, 'Name', name),
+    h('label', {}, 'Connection URL', h('div', { class: 'url-preview mono' }, c.url)),
+    h('label', {}, 'Tags', tags.dom),
+    env ? h('div', { class: 'hint' }, 'This connection comes from an environment variable: only its tags can change here. You can also set them with ', h('code', {}, `DATABASE_TAGS_${c.id.replace(/^env-/, '').toUpperCase()}`), '.') : null,
+    h('label', { class: 'check' }, ro, 'Read-only (block data changes)'),
+    status);
+  const save = h('button', {
+    class: 'btn primary', onclick: async () => {
+      save.disabled = true;
+      try {
+        const patch = { tags: tags.value() };
+        if (!env) { patch.name = name.value; patch.readOnly = ro.checked; }
+        const updated = await api(`/connections/${c.id}`, { method: 'PATCH', body: patch });
+        const i = state.connections.findIndex((x) => x.id === c.id);
+        if (i >= 0) state.connections[i] = updated;
+        close();
+        if (c.id === state.connId && !env && updated.readOnly !== c.readOnly) selectConnection(c.id, true);
+        else render();
+        toast('Connection saved', 'success');
+      } catch (e) { status.textContent = e.message; status.className = 'form-status error'; save.disabled = false; }
+    },
+  }, 'Save');
+  const close = openModal('Edit connection', body, [h('button', { class: 'btn', onclick: () => close() }, 'Cancel'), save]);
+}
+
 function openConnMenu(anchor) {
-  const items = state.connections.map((c) =>
+  const allTags = [...new Set(state.connections.flatMap((c) => c.tags || []))].sort((a, b) => TAG_PRESETS.indexOf(a) - TAG_PRESETS.indexOf(b) || a.localeCompare(b));
+  const filter = new Set((store.get('rs.connTagFilter', []) || []).filter((t) => allTags.includes(t)));
+  const visible = state.connections.filter((c) => !filter.size || (c.tags || []).some((t) => filter.has(t)));
+  const filterBar = allTags.length ? h('div', { class: 'tag-filter', onclick: (e) => e.stopPropagation() },
+    h('span', { class: 'muted small' }, 'Tags'),
+    allTags.map((t) => h('button', {
+      type: 'button', class: `tag-chip tone-${tagTone(t)} toggle${filter.has(t) ? ' on' : ''}`, title: filter.has(t) ? 'Show all' : `Only ${t}`,
+      onclick: () => {
+        if (filter.has(t)) filter.delete(t); else filter.add(t);
+        store.set('rs.connTagFilter', [...filter]);
+        closeMenu();
+        openConnMenu(anchor);
+      },
+    }, t))) : null;
+  const items = visible.map((c) =>
     h('div', {
       class: `menu-item${c.id === state.connId ? ' active' : ''}`,
       title: 'Click to switch · Ctrl+click or middle-click to open in a new browser tab',
@@ -607,12 +726,13 @@ function openConnMenu(anchor) {
       onauxclick: (e) => { if (e.button === 1) { closeMenu(); window.open(connUrl(c.id), '_blank'); } },
     },
       h('span', { class: `dialect-dot ${c.dialect || ''}` }),
-      h('span', { class: 'menu-text' }, h('b', {}, c.name), h('small', {}, c.url)),
+      h('span', { class: 'menu-text' }, h('b', {}, h('span', { class: 'menu-name' }, c.name), tagChips(c, 3)), h('small', {}, c.url)),
       h('a', {
         class: 'icon-btn', href: connUrl(c.id), target: '_blank', title: state.info?.desktop ? 'Open in a new window' : 'Open in a new browser tab',
         onclick: (e) => { e.stopPropagation(); closeMenu(); },
       }, icon('expand', 13)),
       c.readOnly ? h('span', { class: 'badge' }, 'read-only') : null,
+      h('button', { class: 'icon-btn', title: 'Edit name and tags', onclick: (e) => { e.stopPropagation(); closeMenu(); openEditConnection(c); } }, icon('edit', 13)),
       c.source === 'user'
         ? h('button', {
           class: 'icon-btn danger', title: 'Remove connection',
@@ -635,6 +755,8 @@ function openConnMenu(anchor) {
         }, icon('trash', 13))
         : h('span', { class: 'badge muted', title: 'Defined by environment variable' }, 'env'),
     ));
+  if (filterBar) items.unshift(filterBar);
+  if (filter.size && !visible.length) items.push(h('div', { class: 'menu-item muted' }, 'No connections with these tags'));
   items.push(h('div', { class: 'menu-sep' }));
   items.push(h('div', { class: 'menu-item', onclick: () => { closeMenu(); openConnectionModal(); } }, icon('plus'), h('span', {}, 'Add connection')));
   if (state.connId) {
@@ -818,6 +940,7 @@ function openConnectionModal() {
   let mode = store.get('rs.connMode', 'fields');
   const name = h('input', { class: 'input', placeholder: 'My database' });
   const ro = h('input', { type: 'checkbox' });
+  const tags = tagEditor([]);
   const status = h('div', { class: 'form-status' });
   const setStatus = (text, kind) => { status.textContent = text; status.className = `form-status ${kind || ''}`; };
 
@@ -974,6 +1097,7 @@ function openConnectionModal() {
     h('div', { class: 'form-top' }, h('label', {}, 'Name', name), h('label', {}, 'Connect with', modeSeg)),
     fieldsPane,
     urlPane,
+    h('label', {}, h('span', {}, 'Tags ', h('span', { class: 'opt' }, '(optional)')), tags.dom),
     h('label', { class: 'check' }, ro, 'Read-only (block data changes)'),
     status,
   );
@@ -992,7 +1116,7 @@ function openConnectionModal() {
       setStatus('Connecting…');
       save.disabled = true;
       try {
-        const c = await api('/connections', { body: { name: name.value, url: currentUrl(), readOnly: ro.checked } });
+        const c = await api('/connections', { body: { name: name.value, url: currentUrl(), readOnly: ro.checked, tags: tags.value() } });
         state.connections.push(c);
         close();
         selectConnection(c.id);

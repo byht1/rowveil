@@ -14,6 +14,7 @@ Supports **PostgreSQL**, **MySQL / MariaDB**, **SQLite**, **Redis / Valkey** and
 - Several connections: from environment variables and added in the UI (stored in `connections.json`).
 - Add a connection with separate fields (database type, host, port, user, password, database, SSL) or with a URL. Special characters in the password are encoded for you.
 - Open each connection in its own window (in the browser version, in its own tab).
+- Tags on connections: presets `LOCAL`, `DEV`, `TEST`, `STAGE`, `PROD` or your own (up to 8). Colored chips in the connection menu, a tag filter, and edit name / tags / read-only later. A `PROD` connection gets a red line over the work area and `[PROD]` in the window title.
 - Tables and views, schema / database picker, search, row estimates.
 - Grid: pagination, sorting (Shift+click sorts by several columns), resizable and hideable columns.
 - Filters: `=, <>, >, >=, <, <=, like, ilike, not like, not ilike, in, not in, is null, is not null`.
@@ -150,6 +151,7 @@ Details and connection URLs: [examples/testbed/README.md](examples/testbed/READM
 |---|---|---|
 | `DATABASE_URL` / `--url` | Main connection (desktop: an argument) | — |
 | `DATABASE_URL_<NAME>` | More connections (named `<name>`) | — |
+| `DATABASE_TAGS_<NAME>` | Tags of that connection: `DEV,LOCAL` (`DATABASE_TAGS` for `DATABASE_URL`). Tags changed in the UI are kept in `env-connection-tags.json` | — |
 | `STUDIO_HOST` / `--host` | Address (`rowveil-server` only) | `127.0.0.1` (Docker: `0.0.0.0`) |
 | `STUDIO_PORT` / `--port` | Port (`rowveil-server` only) | `4983` |
 | `STUDIO_DATA_DIR` / `--data-dir` | Folder for `connections.json` | `%APPDATA%\rowveil` (Docker: `/data`) |

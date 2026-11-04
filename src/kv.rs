@@ -9,6 +9,9 @@ use std::collections::HashMap;
 use std::time::Duration;
 use tokio::sync::Mutex;
 
+/// SCAN COUNT per step when a pattern or a type filter is set.
+const SCAN_STEP_FILTERED: usize = 5000;
+
 /// Max items of a collection (hash, list, set, …) returned per request.
 const PAGE_MAX: i64 = 1000;
 /// Max bytes of a string value shown in the UI.
@@ -121,17 +124,33 @@ impl Redis {
         let want = req.count.clamp(10, 5000) as usize;
         let mut cursor: u64 = req.cursor.parse().unwrap_or(0);
         let mut keys: Vec<Vec<u8>> = Vec::new();
+        let type_filter = req.key_type.as_deref().filter(|t| !t.is_empty());
+        // Exact-key fast path: a filter without glob characters may name a key directly; show it
+        // first, before SCAN walks a possibly huge keyspace.
+        let mut exact: Option<Vec<u8>> = None;
+        if cursor == 0 {
+            if let Some(k) = req.exact.as_deref().filter(|k| !k.is_empty()) {
+                let n: i64 = redis::cmd("EXISTS").arg(k).query_async(&mut c).await?;
+                if n > 0 {
+                    exact = Some(k.as_bytes().to_vec());
+                    keys.push(k.as_bytes().to_vec());
+                }
+            }
+        }
+        // A filter matches few keys per SCAN step, so each step walks more of the keyspace
+        // (one round trip over a VPN costs ~100 ms).
+        let step = if pattern != "*" || type_filter.is_some() { SCAN_STEP_FILTERED } else { want.max(200) };
         // SCAN may return few keys per call: loop until the page is full or the scan ends,
         // but never longer than about a second.
         let started = std::time::Instant::now();
         loop {
             let mut cmd = redis::cmd("SCAN");
-            cmd.arg(cursor).arg("MATCH").arg(&pattern).arg("COUNT").arg(want.max(200));
-            if let Some(t) = req.key_type.as_deref().filter(|t| !t.is_empty()) {
+            cmd.arg(cursor).arg("MATCH").arg(&pattern).arg("COUNT").arg(step);
+            if let Some(t) = type_filter {
                 cmd.arg("TYPE").arg(t);
             }
             let (next, batch): (u64, Vec<Vec<u8>>) = cmd.query_async(&mut c).await?;
-            keys.extend(batch);
+            keys.extend(batch.into_iter().filter(|k| exact.as_ref() != Some(k)));
             cursor = next;
             if cursor == 0 || keys.len() >= want || started.elapsed() > Duration::from_millis(1200) {
                 break;
@@ -148,8 +167,13 @@ impl Redis {
             .map(|(i, k)| {
                 let t = meta.get(i * 2).map(reply_text).unwrap_or_default();
                 let ttl = meta.get(i * 2 + 1).and_then(|v| if let RV::Int(n) = v { Some(*n) } else { None }).unwrap_or(-1);
-                json!({ "key": key_text(k), "type": t, "ttl": ttl })
+                let mut v = json!({ "key": key_text(k), "type": t, "ttl": ttl });
+                if exact.as_ref() == Some(k) {
+                    v["exact"] = json!(true);
+                }
+                v
             })
+            .filter(|v| type_filter.is_none_or(|t| v["type"] == t || v["exact"].is_null()))
             .collect();
         Ok(json!({ "cursor": cursor.to_string(), "keys": items }))
     }
@@ -737,6 +761,9 @@ pub struct ScanRequest {
     pub count: i64,
     #[serde(default, rename = "type")]
     pub key_type: Option<String>,
+    /// A literal key to check with EXISTS on the first page (the filter text without globs).
+    #[serde(default)]
+    pub exact: Option<String>,
 }
 
 fn default_count() -> i64 {

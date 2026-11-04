@@ -1,4 +1,4 @@
-Rowveil 0.4.0 adds **Redis** and **Google BigQuery**, and the desktop app now **updates itself**.
+Rowveil 0.4.1 adds **tags for connections** and fixes **Redis key search**.
 
 ## Downloads
 
@@ -14,22 +14,17 @@ Rowveil 0.4.0 adds **Redis** and **Google BigQuery**, and the desktop app now **
 
 ## What's new
 
-- **Automatic updates.** The desktop app checks GitHub for a new version on start and every 6 hours. Click **Update** in the sidebar footer, then **Download and install** and **Restart and update**.
-  - The download is checked against `SHA256SUMS.txt`.
-  - MSI installs update with `msiexec` (one UAC prompt); the portable `.exe`, the macOS app and the Linux `.tar.gz` replace themselves. A `.deb` install shows a link to the release.
-  - Turn off automatic checks in the updates window (click the version number).
-  - **Version 0.3.0 has no updater: install 0.4.0 once by hand.** Later versions update themselves.
-- **Redis and Valkey** (`redis://`, `rediss://`, `valkey://`).
-  - Key browser: database picker with key counts, glob filter, type filter, a tree grouped by `:`; keys load in `SCAN` batches.
-  - Editors for strings (text or JSON), hashes, lists, sets, sorted sets, streams (with consumer groups) and RedisJSON documents.
-  - TTL, rename, delete, new keys of any type.
-  - A redis-cli style console with history. Read-only connections run read commands only.
-- **Google BigQuery** (`bigquery://PROJECT/DATASET?credentials=key.json`).
-  - Credentials: a service account key, `GOOGLE_APPLICATION_CREDENTIALS`, `gcloud auth application-default login` or the Google Cloud metadata server.
-  - Datasets, tables, views; `STRUCT` / `ARRAY` as JSON.
-  - Browsing a table without filters is free (no query job). Filtered views and the console show bytes processed and billed; `Explain` does a dry run. `maximumBytesBilled` caps each query.
-  - The Schema view shows the DDL; Copy schema exports the whole project.
-- **README in English** (Ukrainian: `README.uk.md`).
+- **Connection tags.** Mark connections as `LOCAL`, `DEV`, `TEST`, `STAGE`, `PROD` or with your own tags (up to 8).
+  - Colored tags in the connection menu, and a tag filter at its top.
+  - Edit the name, tags and read-only flag of a saved connection (the ✎ button).
+  - A `PROD` connection gets a red line over the work area and `[PROD]` in the window title.
+  - Connections from environment variables: `DATABASE_TAGS_<NAME>=DEV,LOCAL`, or set the tags in the UI.
+- **Redis key search fixes.**
+  - The filter input keeps focus while keys load.
+  - Typing a new filter cancels the previous search instead of being ignored.
+  - On large databases the search continues by itself until it finds matches or reaches the end; each step scans more keys.
+  - A filter that names a key exactly (for example `cron:config`) shows that key at once.
+- **Updates.** Rowveil 0.4.0 offers this version through the **Update** button in the sidebar footer.
 
 ## Where your data is stored
 

@@ -14,6 +14,7 @@ Database explorer & query tool. Окремий десктопний застос
 - Кілька підключень: з env та додані через UI (зберігаються в `connections.json`).
 - Нове підключення додається двома способами: окремими полями (тип БД, host, port, user, password, database, SSL) або рядком URL. Спецсимволи в паролі кодуються автоматично.
 - Кожне підключення можна відкрити в окремому вікні (у браузерній версії — в окремій вкладці).
+- Теги підключень: готові `LOCAL`, `DEV`, `TEST`, `STAGE`, `PROD` або власні (до 8). Кольорові мітки в меню підключень, фільтр за тегами, зміна назви / тегів / read-only пізніше. Підключення з `PROD` має червону лінію над робочою областю і `[PROD]` у заголовку вікна.
 - Список таблиць і view, вибір схеми / бази, пошук, оцінка кількості рядків.
 - Грід: пагінація, сортування (Shift+клік — за кількома колонками), зміна ширини колонок, приховування колонок.
 - Фільтри: `=, <>, >, >=, <, <=, like, ilike, not like, not ilike, in, not in, is null, is not null`.
@@ -150,6 +151,7 @@ docker compose -f examples/testbed/docker-compose.yml up -d --build
 |---|---|---|
 | `DATABASE_URL` / `--url` | Основне підключення (у десктопі — аргумент) | — |
 | `DATABASE_URL_<NAME>` | Додаткові підключення (назва = `<name>`) | — |
+| `DATABASE_TAGS_<NAME>` | Теги цього підключення: `DEV,LOCAL` (`DATABASE_TAGS` — для `DATABASE_URL`). Теги, змінені в UI, зберігаються в `env-connection-tags.json` | — |
 | `STUDIO_HOST` / `--host` | Адреса (лише `rowveil-server`) | `127.0.0.1` (Docker: `0.0.0.0`) |
 | `STUDIO_PORT` / `--port` | Порт (лише `rowveil-server`) | `4983` |
 | `STUDIO_DATA_DIR` / `--data-dir` | Папка для `connections.json` | `%APPDATA%\rowveil` (Docker: `/data`) |

@@ -66,6 +66,7 @@ struct AppState {
     pools: Mutex<HashMap<String, Db>>,
     schemas: RwLock<HashMap<String, Arc<DbSchema>>>,
     store: PathBuf,
+    env_tags: PathBuf,
     read_only: bool,
     auth: Option<String>,
     app_token: Option<String>,
@@ -233,6 +234,8 @@ struct NewConnection {
     url: String,
     #[serde(default)]
     read_only: bool,
+    #[serde(default)]
+    tags: Vec<String>,
 }
 
 async fn test_connection(Json(body): Json<NewConnection>) -> ApiResult<Json<Value>> {
@@ -250,6 +253,7 @@ async fn add_connection(State(st): State<Shared>, Json(body): Json<NewConnection
         name,
         url: body.url.trim().to_string(),
         read_only: body.read_only,
+        tags: config::normalize_tags(&body.tags),
         source: "user".into(),
     };
     st.pools.lock().await.insert(cfg.id.clone(), db);
@@ -257,6 +261,45 @@ async fn add_connection(State(st): State<Shared>, Json(body): Json<NewConnection
     conns.push(cfg.clone());
     config::save_user_connections(&st.store, &conns)?;
     Ok(Json(json!(cfg.info(st.read_only))))
+}
+
+#[derive(Deserialize)]
+#[serde(rename_all = "camelCase")]
+struct ConnectionPatch {
+    name: Option<String>,
+    tags: Option<Vec<String>>,
+    read_only: Option<bool>,
+}
+
+/// Renames a saved connection or changes its tags / read-only flag. Connections from the
+/// environment accept only tags (kept in env-connection-tags.json).
+async fn update_connection(State(st): State<Shared>, Path(id): Path<String>, Json(p): Json<ConnectionPatch>) -> ApiResult<Json<Value>> {
+    let mut conns = st.conns.write().await;
+    let c = conns.iter_mut().find(|c| c.id == id).ok_or_else(|| not_found("Connection"))?;
+    let env = c.source == "env";
+    if env && (p.name.is_some() || p.read_only.is_some()) {
+        return Err(ApiError(StatusCode::BAD_REQUEST, "Connections from environment variables accept only tags".into()));
+    }
+    if let Some(name) = p.name {
+        let name = name.trim().to_string();
+        if name.is_empty() {
+            return Err(ApiError(StatusCode::BAD_REQUEST, "Enter a name".into()));
+        }
+        c.name = name;
+    }
+    if let Some(ro) = p.read_only {
+        c.read_only = ro;
+    }
+    if let Some(tags) = p.tags {
+        c.tags = config::normalize_tags(&tags);
+    }
+    let info = c.info(st.read_only);
+    if env {
+        config::save_env_tag_overrides(&st.env_tags, &conns)?;
+    } else {
+        config::save_user_connections(&st.store, &conns)?;
+    }
+    Ok(Json(json!(info)))
 }
 
 async fn delete_connection(State(st): State<Shared>, Path(id): Path<String>) -> ApiResult<Json<Value>> {
@@ -644,7 +687,14 @@ async fn basic_auth(State(st): State<Shared>, headers: HeaderMap, req: Request, 
 /// Builds the HTTP application. Returns the router and the path of the saved-connections file.
 pub fn router(opts: &Options) -> (Router, PathBuf) {
     let store = config::store_path(&opts.data_dir);
+    let env_tags = config::env_tags_path(&opts.data_dir);
     let mut conns = config::env_connections(opts.url.as_deref());
+    let overrides = config::load_env_tag_overrides(&env_tags);
+    for c in &mut conns {
+        if let Some(t) = overrides.get(&c.id) {
+            c.tags = config::normalize_tags(t);
+        }
+    }
     conns.extend(config::load_user_connections(&store));
     let auth = opts
         .basic_auth
@@ -656,6 +706,7 @@ pub fn router(opts: &Options) -> (Router, PathBuf) {
         pools: Mutex::new(HashMap::new()),
         schemas: RwLock::new(HashMap::new()),
         store: store.clone(),
+        env_tags,
         read_only: opts.read_only,
         auth,
         app_token: opts.app_token.clone(),
@@ -666,7 +717,7 @@ pub fn router(opts: &Options) -> (Router, PathBuf) {
         .route("/info", get(info))
         .route("/connections", get(list_connections).post(add_connection))
         .route("/connections/test", post(test_connection))
-        .route("/connections/{id}", axum::routing::delete(delete_connection))
+        .route("/connections/{id}", axum::routing::delete(delete_connection).patch(update_connection))
         .route("/connections/{id}/schema", get(get_schema))
         .route("/connections/{id}/rows", post(get_rows))
         .route("/connections/{id}/apply", post(apply_changes))

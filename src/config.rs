@@ -13,6 +13,9 @@ pub struct ConnConfig {
     pub url: String,
     #[serde(default)]
     pub read_only: bool,
+    /// Labels such as DEV, PROD, LOCAL.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub tags: Vec<String>,
     /// "env" (from environment / CLI, not persisted) or "user".
     #[serde(default = "user_source")]
     pub source: String,
@@ -31,6 +34,27 @@ pub struct ConnInfo {
     pub url: String,
     pub read_only: bool,
     pub source: String,
+    pub tags: Vec<String>,
+}
+
+/// Cleans user input: trimmed, upper case, no duplicates, at most 8 tags of 24 characters.
+pub fn normalize_tags<I: IntoIterator<Item = S>, S: AsRef<str>>(tags: I) -> Vec<String> {
+    let mut out: Vec<String> = Vec::new();
+    for t in tags {
+        let t: String = t
+            .as_ref()
+            .trim()
+            .chars()
+            .filter(|c| c.is_alphanumeric() || matches!(c, '-' | '_' | '.' | ' '))
+            .take(24)
+            .collect::<String>()
+            .trim()
+            .to_uppercase();
+        if !t.is_empty() && !out.contains(&t) && out.len() < 8 {
+            out.push(t);
+        }
+    }
+    out
 }
 
 impl ConnConfig {
@@ -42,6 +66,7 @@ impl ConnConfig {
             url: mask_url(&self.url),
             read_only: self.read_only || global_read_only,
             source: self.source.clone(),
+            tags: self.tags.clone(),
         }
     }
 }
@@ -89,6 +114,7 @@ pub fn env_connections(cli_url: Option<&str>) -> Vec<ConnConfig> {
             name: name_from_url(url),
             url: url.to_string(),
             read_only: false,
+            tags: env_tags("DATABASE_TAGS"),
             source: "env".into(),
         });
     }
@@ -100,6 +126,7 @@ pub fn env_connections(cli_url: Option<&str>) -> Vec<ConnConfig> {
     for (name, url) in extra {
         out.push(ConnConfig {
             id: format!("env-{name}"),
+            tags: env_tags(&format!("DATABASE_TAGS_{}", name.to_ascii_uppercase())),
             name,
             url,
             read_only: false,
@@ -107,6 +134,29 @@ pub fn env_connections(cli_url: Option<&str>) -> Vec<ConnConfig> {
         });
     }
     out
+}
+
+/// `DATABASE_TAGS_<NAME>=DEV,LOCAL` (also `|` or `;` as separators).
+fn env_tags(var: &str) -> Vec<String> {
+    std::env::var(var).map(|v| normalize_tags(v.split([',', '|', ';']))).unwrap_or_default()
+}
+
+/// Tags set in the UI for connections from the environment (they are not in connections.json).
+pub fn env_tags_path(data_dir: &Path) -> PathBuf {
+    data_dir.join("env-connection-tags.json")
+}
+
+pub fn load_env_tag_overrides(path: &Path) -> std::collections::BTreeMap<String, Vec<String>> {
+    std::fs::read_to_string(path).ok().and_then(|s| serde_json::from_str(&s).ok()).unwrap_or_default()
+}
+
+pub fn save_env_tag_overrides(path: &Path, conns: &[ConnConfig]) -> Result<()> {
+    let map: std::collections::BTreeMap<&str, &Vec<String>> =
+        conns.iter().filter(|c| c.source == "env").map(|c| (c.id.as_str(), &c.tags)).collect();
+    if let Some(dir) = path.parent() {
+        std::fs::create_dir_all(dir)?;
+    }
+    std::fs::write(path, serde_json::to_string_pretty(&map)?).with_context(|| format!("Cannot write {}", path.display()))
 }
 
 pub fn store_path(data_dir: &Path) -> PathBuf {
@@ -152,5 +202,13 @@ mod tests {
         assert_eq!(name_from_url("redis://:p%40ss@cache.local:6379/2"), "cache.local");
         assert_eq!(name_from_url("rediss://[::1]:6380"), "::1");
         assert_eq!(name_from_url("bigquery://my-proj/sales?location=EU"), "my-proj");
+    }
+
+    #[test]
+    fn cleans_tags() {
+        assert_eq!(normalize_tags([" dev ", "PROD", "Dev", "", "eu-west 1!"]), ["DEV", "PROD", "EU-WEST 1"]);
+        assert_eq!(normalize_tags((0..20).map(|i| format!("t{i}"))).len(), 8);
+        let old: ConnConfig = serde_json::from_str(r#"{"id":"a","name":"n","url":"sqlite://x.db"}"#).unwrap();
+        assert!(old.tags.is_empty());
     }
 }

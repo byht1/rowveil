@@ -65,6 +65,7 @@ const ICONS = {
   list: '<path d="M8 6h13M8 12h13M8 18h13M3 6h.01M3 12h.01M3 18h.01"/>',
   user: '<circle cx="12" cy="8" r="4"/><path d="M4 21a8 8 0 0 1 16 0"/>',
   shield: '<path d="M12 3l8 3v6c0 5-3.5 8-8 9-4.5-1-8-4-8-9V6z"/>',
+  home: '<path d="M3 11l9-7 9 7"/><path d="M5 10v10h14V10"/><path d="M10 20v-6h4v6"/>',
   edit: '<path d="M4 20h4L19 9l-4-4L4 16z"/><path d="M14 6l4 4"/>',
   external: '<path d="M14 4h6v6M20 4l-9 9M19 14v5a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1V6a1 1 0 0 1 1-1h5"/>',
   schema: '<rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/><path d="M6.5 10v4a2 2 0 0 0 2 2H14"/>',
@@ -186,7 +187,7 @@ const schemaWord = (d) => ({ mysql: 'Database', bigquery: 'Dataset' }[d] || 'Sch
 function saveTabs() {
   if (!state.connId) return;
   const tabs = state.tabs.map((t) => {
-    if (t.type === 'sql') return { type: 'sql', title: t.title, sql: t.sql, savedId: t.savedId || undefined, resHidden: t.resHidden?.names.length ? t.resHidden : undefined };
+    if (t.type === 'sql') return { type: 'sql', title: t.title, sql: t.sql, savedId: t.savedId || undefined, resHidden: t.resHidden?.names.length ? t.resHidden : undefined, resWidths: t.resWidths?.sig ? t.resWidths : undefined };
     if (t.type === 'schema') return { type: 'schema', section: t.section, sel: t.sel, schemaFilter: t.schemaFilter };
     if (t.type === 'rkey' || t.type === 'rcli') return R.saveTab(t);
     return { type: 'table', schema: t.schema, table: t.table, filters: t.filters, sort: t.sort, pageSize: t.pageSize, hidden: t.hidden, widths: t.widths, view: t.view };
@@ -202,7 +203,7 @@ function restoreTabs() {
   if (!saved) return;
   if (saved.schemaName && state.schema.schemas.includes(saved.schemaName)) state.schemaName = saved.schemaName;
   for (const t of saved.tabs || []) {
-    if (t.type === 'sql') state.tabs.push(Object.assign(newSqlTab(t.title, t.sql), { savedId: t.savedId || null, resHidden: t.resHidden?.sig ? t.resHidden : null }));
+    if (t.type === 'sql') state.tabs.push(Object.assign(newSqlTab(t.title, t.sql), { savedId: t.savedId || null, resHidden: t.resHidden?.sig ? t.resHidden : null, resWidths: t.resWidths?.sig ? t.resWidths : null }));
     else if (t.type === 'schema') state.tabs.push(newSchemaTab(t));
     else if (t.type === 'rkey' || t.type === 'rcli') { if (isRedis()) state.tabs.push(R.restoreTab(t)); }
     else if (findTable(t.schema, t.table)) state.tabs.push(newTableTab(t.schema, t.table, t));
@@ -237,7 +238,7 @@ function newTableTab(schema, table, opts = {}) {
 }
 
 function newSqlTab(title, sql = '') {
-  return { id: tabSeq++, type: 'sql', title: title || `SQL ${sqlSeq++}`, sql, results: null, error: null, running: false, activeResult: 0, duration: null, resHidden: null };
+  return { id: tabSeq++, type: 'sql', title: title || `SQL ${sqlSeq++}`, sql, results: null, error: null, running: false, activeResult: 0, duration: null, resHidden: null, resWidths: null };
 }
 
 // ---------------------------------------------------------------- boot
@@ -252,12 +253,14 @@ async function boot() {
     toast(e.message, 'error');
   }
   // The URL hash selects the connection, so each browser tab can show its own database.
+  // Without a connection in the URL, the start page opens (or the last connection, when the user chose that).
   const last = store.get('rs.conn', null);
   const pick = state.connections.find((c) => c.id === hashConn())
-    || state.connections.find((c) => c.id === last) || state.connections[0];
+    || (store.get('rs.openLast', false) ? state.connections.find((c) => c.id === last) : null);
   window.addEventListener('hashchange', () => {
     const id = hashConn();
-    if (id && id !== state.connId && state.connections.some((c) => c.id === id)) selectConnection(id);
+    if (!id) { if (state.connId) goHome(); return; }
+    if (id !== state.connId && state.connections.some((c) => c.id === id)) selectConnection(id);
   });
   if (pick) await selectConnection(pick.id);
   else render();
@@ -378,6 +381,20 @@ function connUrl(id) {
   return `${location.pathname}#/${encodeURIComponent(id)}`;
 }
 
+// The start page: no connection is selected.
+function goHome() {
+  if (state.connId) saveTabs();
+  state.connId = null;
+  state.schema = null;
+  state.schemaError = null;
+  state.loadingSchema = false;
+  state.tabs = [];
+  state.activeTab = null;
+  if (location.hash) history.replaceState(null, '', location.pathname + location.search);
+  document.title = 'Rowveil';
+  render();
+}
+
 async function selectConnection(id, refresh = false) {
   if (state.connId && state.connId !== id) saveTabs();
   state.connId = id;
@@ -468,7 +485,7 @@ function renderSidebar() {
   sb.append(h('div', { class: 'sb-head' }, switcher));
 
   if (!c) {
-    sb.append(h('div', { class: 'sb-empty' }, 'Add a database connection to start.'));
+    sb.append(h('div', { class: 'sb-empty' }, state.connections.length ? 'Choose a connection on the start page.' : 'Add a database connection to start.'));
     sb.append(sidebarFooter());
     return;
   }
@@ -754,19 +771,16 @@ function openConnMenu(anchor) {
               await api(`/connections/${c.id}`, { method: 'DELETE' });
               state.connections = state.connections.filter((x) => x.id !== c.id);
               closeMenu();
-              if (state.connId === c.id) {
-                state.connId = null;
-                state.schema = null;
-                state.tabs = [];
-                const next = state.connections[0];
-                if (next) selectConnection(next.id); else render();
-              } else renderSidebar();
+              if (state.connId === c.id) goHome();
+              else if (!state.connId) render();
+              else renderSidebar();
             } catch (err) { toast(err.message, 'error'); }
           },
         }, icon('trash', 13))
         : h('span', { class: 'badge muted', title: 'Defined by environment variable' }, 'env'),
     ));
   if (filterBar) items.unshift(filterBar);
+  if (state.connId) items.unshift(h('div', { class: 'menu-item', onclick: () => { closeMenu(); goHome(); } }, icon('home'), h('span', {}, 'All connections')));
   if (filter.size && !visible.length) items.push(h('div', { class: 'menu-item muted' }, 'No connections with these tags'));
   items.push(h('div', { class: 'menu-sep' }));
   items.push(h('div', { class: 'menu-item', onclick: () => { closeMenu(); openConnectionModal(); } }, icon('plus'), h('span', {}, 'Add connection')));
@@ -1145,7 +1159,7 @@ function renderMain() {
   const main = $('#main');
   main.replaceChildren();
   if (!conn()) {
-    main.append(welcome());
+    main.append(state.connections.length ? homePage() : welcome());
     return;
   }
   main.append(renderTabBar());
@@ -1182,6 +1196,74 @@ function welcome() {
     h('p', { class: 'muted' }, 'Browse and edit PostgreSQL, MySQL, SQLite, Redis and BigQuery.'),
     h('button', { class: 'btn primary', onclick: openConnectionModal }, icon('plus'), 'Add connection'),
   );
+}
+
+// The start page: all connections as cards, with search and the tag filter (shared with the connection menu).
+function homePage() {
+  const rank = (t) => { const i = TAG_PRESETS.indexOf(t); return i < 0 ? TAG_PRESETS.length : i; };
+  const allTags = [...new Set(state.connections.flatMap((c) => c.tags || []))].sort((a, b) => rank(a) - rank(b) || a.localeCompare(b));
+  const filter = new Set((store.get('rs.connTagFilter', []) || []).filter((t) => allTags.includes(t)));
+  const last = store.get('rs.conn', null);
+  const grid = h('div', { class: 'home-grid' });
+  const search = h('input', { class: 'home-search', type: 'search', placeholder: 'Search connections…', autofocus: true });
+  const open = (c, e) => {
+    if (e && (e.ctrlKey || e.metaKey || e.button === 1)) window.open(connUrl(c.id), '_blank');
+    else selectConnection(c.id);
+  };
+  const matches = () => {
+    const q = search.value.trim().toLowerCase();
+    return state.connections.filter((c) => (!filter.size || (c.tags || []).some((t) => filter.has(t)))
+      && (!q || `${c.name} ${c.url} ${DIALECT_LABEL[c.dialect] || ''} ${(c.tags || []).join(' ')}`.toLowerCase().includes(q)));
+  };
+  const card = (c) => h('div', {
+    class: `home-card${isProd(c) ? ' prod' : ''}`, tabindex: '0', role: 'button',
+    title: 'Click to open · Ctrl+click or middle-click to open in a new browser tab',
+    onclick: (e) => open(c, e),
+    onauxclick: (e) => { if (e.button === 1) open(c, e); },
+    onkeydown: (e) => { if (e.key === 'Enter') open(c, e); },
+  },
+    h('div', { class: 'home-card-head' },
+      h('span', { class: `dialect-dot ${c.dialect || ''}` }),
+      h('span', { class: 'home-card-name' }, c.name),
+      h('button', { class: 'icon-btn', title: 'Edit name and tags', onclick: (e) => { e.stopPropagation(); openEditConnection(c); } }, icon('edit', 13))),
+    h('div', { class: 'home-card-meta' },
+      h('span', { class: 'muted small' }, DIALECT_LABEL[c.dialect] || c.dialect),
+      c.readOnly ? h('span', { class: 'badge' }, 'read-only') : null,
+      c.id === last ? h('span', { class: 'badge muted' }, 'last used') : null,
+      tagChips(c, 4)),
+    h('div', { class: 'home-card-url mono' }, c.url));
+  const draw = () => {
+    const list = matches();
+    grid.replaceChildren(...list.map(card),
+      h('button', { class: 'home-card home-add', onclick: openConnectionModal }, icon('plus', 18), h('span', {}, 'Add connection')));
+    if (!list.length) grid.prepend(h('div', { class: 'muted home-none' }, 'No connections match.'));
+  };
+  search.addEventListener('input', draw);
+  search.addEventListener('keydown', (e) => { if (e.key === 'Enter') { const c = matches()[0]; if (c) open(c, e); } });
+  const chips = allTags.length ? h('div', { class: 'home-tags' },
+    h('button', { type: 'button', class: `tag-chip tone-other toggle${filter.size ? '' : ' on'}`, title: 'Show all connections', onclick: () => { filter.clear(); store.set('rs.connTagFilter', []); render(); } }, 'All'),
+    allTags.map((t) => h('button', {
+      type: 'button', class: `tag-chip tone-${tagTone(t)} toggle${filter.has(t) ? ' on' : ''}`,
+      title: `${filter.size === 1 && filter.has(t) ? 'Show all' : `Only ${t}`} · Ctrl+click to select several tags`,
+      onclick: (e) => {
+        if (e.ctrlKey || e.metaKey || e.shiftKey) { if (filter.has(t)) filter.delete(t); else filter.add(t); }
+        else if (filter.size === 1 && filter.has(t)) filter.clear();
+        else { filter.clear(); filter.add(t); }
+        store.set('rs.connTagFilter', [...filter]);
+        render();
+      },
+    }, t))) : null;
+  const openLast = h('input', { type: 'checkbox', checked: store.get('rs.openLast', false), onchange: (e) => store.set('rs.openLast', e.target.checked) });
+  draw();
+  queueMicrotask(() => search.focus());
+  return h('div', { class: 'home' },
+    h('div', { class: 'home-inner' },
+      h('div', { class: 'home-brand' },
+        h('img', { src: '/brand/symbol.svg', width: 48, height: 48, alt: '' }),
+        h('div', {}, h('h1', { class: 'welcome-title' }, 'Rowveil'), h('p', { class: 'welcome-tag' }, 'Choose a connection'))),
+      h('div', { class: 'home-bar' }, search, chips),
+      grid,
+      h('label', { class: 'home-opt muted small' }, openLast, 'Open the last connection on start')));
 }
 
 function tabTitle(t) {
@@ -1599,7 +1681,7 @@ function renderGrid(tab, meta) {
         h('span', { class: 'th-type' }, c.dataType),
         s ? h('span', { class: 'sort-ind' }, s.desc ? '↓' : '↑', tab.sort.length > 1 ? tab.sort.indexOf(s) + 1 : '') : null,
       ),
-      h('div', { class: 'resizer', onmousedown: (e) => startResize(e, tab, c) }));
+      h('div', { class: 'resizer', onmousedown: (e) => startResize(e, tab.widths, c.name) }));
       return th;
     }),
   );
@@ -1703,7 +1785,8 @@ function toggleSort(tab, column, additive) {
   loadRows(tab, { keepSelection: true });
 }
 
-function startResize(e, tab, c) {
+// widths: { columnName: px }; the new width is stored there and the tabs are saved on mouse up.
+function startResize(e, widths, name) {
   e.preventDefault();
   e.stopPropagation();
   const th = e.target.parentElement;
@@ -1713,7 +1796,7 @@ function startResize(e, tab, c) {
   const startX = e.clientX;
   const startW = th.getBoundingClientRect().width;
   document.body.classList.add('resizing');
-  const move = (ev) => { const w = Math.max(60, startW + ev.clientX - startX); col.style.width = `${w}px`; tab.widths[c.name] = Math.round(w); };
+  const move = (ev) => { const w = Math.max(60, startW + ev.clientX - startX); col.style.width = `${w}px`; widths[name] = Math.round(w); };
   const up = () => { document.removeEventListener('mousemove', move); document.removeEventListener('mouseup', up); document.body.classList.remove('resizing'); saveTabs(); };
   document.addEventListener('mousemove', move);
   document.addEventListener('mouseup', up);
@@ -2751,7 +2834,7 @@ function renderSqlResults(tab) {
     res.columns.length ? h('button', { class: 'btn ghost sm', onclick: () => download('result.json', asJson(), 'application/json') }, icon('download', 13), 'JSON') : null,
   );
   box.append(head);
-  if (res.columns.length) box.append(mode === 'json' ? h('pre', { class: 'res-json mono', html: highlightJson(asJson()) }) : staticGrid(res, vis));
+  if (res.columns.length) box.append(mode === 'json' ? h('pre', { class: 'res-json mono', html: highlightJson(asJson()) }) : staticGrid(res, vis, resWidths(tab, sig)));
   return box;
 }
 
@@ -2765,13 +2848,21 @@ function highlightJson(src) {
 }
 
 /** A read-only grid of a SQL result. `vis` lists the indexes of the visible columns. */
-function staticGrid(res, vis = res.columns.map((c, i) => i)) {
+// Column widths of a SQL result belong to the tab and to this exact set of result columns (like hidden columns).
+function resWidths(tab, sig) {
+  if (tab.resWidths?.sig !== sig) tab.resWidths = { sig, w: {} };
+  return tab.resWidths.w;
+}
+
+// widths: optional { columnName: px }; when given, the columns can be resized with the mouse.
+function staticGrid(res, vis = res.columns.map((c, i) => i), widths = null) {
   const cols = res.columns;
   const shown = vis.map((i) => cols[i]);
   const table = h('table', { class: 'grid' },
-    h('colgroup', {}, h('col', { style: { width: '56px' } }), shown.map((c) => h('col', { style: { width: `${defaultWidth({ kind: c.kind, name: c.name })}px` } }))),
+    h('colgroup', {}, h('col', { style: { width: '56px' } }), shown.map((c) => h('col', { style: { width: `${widths?.[c.name] || defaultWidth({ kind: c.kind, name: c.name })}px` } }))),
     h('thead', {}, h('tr', {}, h('th', { class: 'rownum' }, '#'), shown.map((c) => h('th', { title: `${c.name} ${c.type}` },
-      h('div', { class: 'th-inner' }, h('span', { class: 'th-name' }, c.name), h('span', { class: 'th-type' }, c.type.toLowerCase())))))),
+      h('div', { class: 'th-inner' }, h('span', { class: 'th-name' }, c.name), h('span', { class: 'th-type' }, c.type.toLowerCase())),
+      widths ? h('div', { class: 'resizer', onmousedown: (e) => startResize(e, widths, c.name) }) : null)))),
     h('tbody', {}, res.rows.map((row, i) => h('tr', {}, h('td', { class: 'rownum' }, h('span', { class: 'rn' }, String(i + 1))),
       vis.map((ci) => { const d = displayValue(row[ci], cols[ci]); return h('td', { class: `cell ro ${d.cls}`, dataset: { ci: String(ci) } }, h('span', { class: 'cell-text' }, d.text)); })))),
   );

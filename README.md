@@ -11,7 +11,7 @@ Supports **PostgreSQL**, **MySQL / MariaDB**, **SQLite**, **Redis / Valkey** and
 
 ## Features
 
-- Several connections: from environment variables and added in the UI (stored in `connections.json`).
+- Several connections: from environment variables and added in the UI (stored in `connections.json`). A start page lists them with search and a tag filter.
 - Add a connection with separate fields (database type, host, port, user, password, database, SSL) or with a URL. Special characters in the password are encoded for you.
 - Open each connection in its own window (in the browser version, in its own tab).
 - Tags on connections: presets `LOCAL`, `DEV`, `TEST`, `STAGE`, `PROD` or your own (up to 8). Colored chips in the connection menu, a tag filter, and edit name / tags / read-only later. A `PROD` connection gets a red line over the work area and `[PROD]` in the window title.
@@ -35,7 +35,7 @@ Supports **PostgreSQL**, **MySQL / MariaDB**, **SQLite**, **Redis / Valkey** and
   - VS Code shortcuts: `Alt+↑/↓`, `Shift+Alt+↑/↓`, `Ctrl+D`, `Ctrl+Shift+L`, `Ctrl+/`, `Ctrl+Shift+K`, `Ctrl+L`, `Alt+Click`, `Ctrl+F` and more (the keyboard button in the toolbar lists them all);
   - highlighting, autocomplete (tables, columns, aliases, keywords, dialect functions; `Tab` or `Enter` accepts a suggestion), line numbers, folding, history;
   - saved queries (`Ctrl+S`): for one connection or for all connections of the dialect, listed in the sidebar;
-  - results as a table or JSON, several result sets, hide columns, copy, CSV / JSON export.
+  - results as a table or JSON, several result sets, resize and hide columns, copy, CSV / JSON export.
 - CSV / JSON export (the current page or all filtered rows, up to 10,000).
 - Themes: Rowveil Light and Rowveil Dark (follows the system by default), Graphite, Paper, One Dark Pro, Dracula, Nord, GitHub Light (button at the bottom of the sidebar, preview on hover).
 - Read-only mode. Optional Basic Auth.

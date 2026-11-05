@@ -1,4 +1,4 @@
-Rowveil 0.4.2 adds **saved queries** and **column visibility for SQL results**, and fixes autocomplete, the tag filter and the Redis JSON editor.
+Rowveil 0.4.3 adds a **start page** and **column resizing for SQL results**, and removes the terminal window that flashed on Windows when Rowveil checked for updates.
 
 ## Downloads
 
@@ -14,17 +14,15 @@ Rowveil 0.4.2 adds **saved queries** and **column visibility for SQL results**, 
 
 ## What's new
 
-- **Saved queries.** Keep SQL statements and Redis commands for later.
-  - `Ctrl+S` or the **Save** button in the SQL console and in the Redis console.
-  - A query belongs to one connection, or to all connections of the same dialect (for DEV / PROD copies of one database).
-  - The **Saved queries** section in the sidebar opens a query; hover it to rename or delete it.
-  - The queries are stored in `saved-queries.json` next to `connections.json`.
-- **Columns for SQL results.** Hide columns of a result with the **Columns** button. Copy, CSV and JSON use the visible columns. The setting belongs to the SQL tab and to that set of result columns.
+- **Start page.** Rowveil now opens on a page with all your connections, so you choose the database yourself. Earlier, Rowveil opened the first connection in the list.
+  - Search the connections by name, address, dialect or tag. `Enter` opens the first match.
+  - Filter the connections by tag, as in the connection menu.
+  - **All connections** in the connection menu goes back to the start page.
+  - Select **Open the last connection on start** to skip the start page.
+- **Column width for SQL results.** Drag the right edge of a column header to change the width, as in the table view. The width belongs to the SQL tab and to that set of result columns; it stays after a reload.
 - **Fixes.**
-  - Autocomplete: `Tab` accepts the selected suggestion (the first one by default), as in VS Code. Without suggestions, `Tab` indents.
-  - Tag filter in the connection menu: a click shows only that tag (a second click clears the filter); `Ctrl+click` selects several tags; **All** shows all connections. Custom tags follow the preset tags.
-  - Redis: the JSON editor of a key fills the full height of the window.
-- **Updates.** Rowveil 0.4.0 and 0.4.1 offer this version through the **Update** button in the sidebar footer.
+  - Windows: a terminal window no longer flashes when you click **Update** in the sidebar footer. The same fix applies to **Grant write access**.
+- **Updates.** Rowveil 0.4.0 – 0.4.2 offer this version through the **Update** button in the sidebar footer. In 0.4.2 and earlier, the terminal window can still flash once during this update.
 
 ## Where your data is stored
 

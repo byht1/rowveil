@@ -61,8 +61,11 @@ pub async fn grant_write(paths: &[PathBuf]) -> Result<()> {
     // different admin account, and the grant must go to the user who runs Rowveil.
     // Full path: a `whoami` from Git Bash / MSYS on PATH does not understand these flags.
     let system32 = PathBuf::from(std::env::var_os("SystemRoot").unwrap_or_else(|| "C:\\Windows".into())).join("System32");
+    // CREATE_NO_WINDOW: console programs would flash a terminal window over the app.
+    const CREATE_NO_WINDOW: u32 = 0x0800_0000;
     let out = Command::new(system32.join("whoami.exe"))
         .args(["/user", "/fo", "csv", "/nh"])
+        .creation_flags(CREATE_NO_WINDOW)
         .output()
         .await
         .context("whoami failed")?;
@@ -93,6 +96,7 @@ pub async fn grant_write(paths: &[PathBuf]) -> Result<()> {
     );
     let status = Command::new("powershell.exe")
         .args(["-NoProfile", "-NonInteractive", "-ExecutionPolicy", "Bypass", "-Command", &ps])
+        .creation_flags(CREATE_NO_WINDOW)
         .status()
         .await
         .context("cannot start PowerShell");

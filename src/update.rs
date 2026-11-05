@@ -317,9 +317,12 @@ fn dir_writable(dir: &Path) -> bool {
 fn detect_method() -> Method {
     let Ok(exe) = std::env::current_exe() else { return Method::Manual };
     let dir = exe.parent().map(Path::to_path_buf).unwrap_or_default();
+    use std::os::windows::process::CommandExt;
     // The MSI records its folder: HKLM\Software\Rowveil InstallDir.
+    // CREATE_NO_WINDOW: reg.exe is a console program; without the flag a terminal window flashes.
     let msi_dir = std::process::Command::new(r"C:\Windows\System32\reg.exe")
         .args(["query", r"HKLM\Software\Rowveil", "/v", "InstallDir"])
+        .creation_flags(0x0800_0000)
         .output()
         .ok()
         .and_then(|o| String::from_utf8(o.stdout).ok())

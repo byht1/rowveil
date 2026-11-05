@@ -1,4 +1,4 @@
-Rowveil 0.4.3 adds a **start page** and **column resizing for SQL results**, and removes the terminal window that flashed on Windows when Rowveil checked for updates.
+Rowveil 0.4.4 fixes the desktop app: the theme and other UI settings now stay after a restart.
 
 ## Downloads
 
@@ -14,15 +14,12 @@ Rowveil 0.4.3 adds a **start page** and **column resizing for SQL results**, and
 
 ## What's new
 
-- **Start page.** Rowveil now opens on a page with all your connections, so you choose the database yourself. Earlier, Rowveil opened the first connection in the list.
-  - Search the connections by name, address, dialect or tag. `Enter` opens the first match.
-  - Filter the connections by tag, as in the connection menu.
-  - **All connections** in the connection menu goes back to the start page.
-  - Select **Open the last connection on start** to skip the start page.
-- **Column width for SQL results.** Drag the right edge of a column header to change the width, as in the table view. The width belongs to the SQL tab and to that set of result columns; it stays after a reload.
-- **Fixes.**
-  - Windows: a terminal window no longer flashes when you click **Update** in the sidebar footer. The same fix applies to **Grant write access**.
-- **Updates.** Rowveil 0.4.0 – 0.4.2 offer this version through the **Update** button in the sidebar footer. In 0.4.2 and earlier, the terminal window can still flash once during this update.
+- **Fix: UI settings after a restart (desktop app).** Earlier, the desktop app lost the theme, the open tabs, the SQL history, the tag filter and the start page option at each launch. Now the app keeps them in `ui-prefs.json` in the data folder. Settings that were lost before do not come back: choose the theme once more after the update.
+- **From 0.4.3.**
+  - A start page with all connections, search and a tag filter. **All connections** in the connection menu goes back to it.
+  - Drag the edge of a column header in SQL results to change the column width.
+  - Windows: no terminal window flashes when Rowveil checks for updates.
+- **Updates.** Rowveil 0.4.0 – 0.4.3 offer this version through the **Update** button in the sidebar footer.
 
 ## Where your data is stored
 
@@ -32,7 +29,7 @@ Rowveil 0.4.3 adds a **start page** and **column resizing for SQL results**, and
 | macOS | `~/Library/Application Support/rowveil/` |
 | Linux | `~/.config/rowveil/` |
 
-The folder holds `connections.json` with your saved connections and `saved-queries.json` with your saved queries. Passwords are stored as plain text inside the connection URLs. It also holds `window.json`, `rowveil.log` and the `webview/` cache.
+The folder holds `connections.json` with your saved connections, `saved-queries.json` with your saved queries, and `ui-prefs.json` with the UI settings of the desktop app. Passwords are stored as plain text inside the connection URLs. It also holds `window.json`, `rowveil.log` and the `webview/` cache.
 
 ## Notes
 

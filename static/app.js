@@ -85,8 +85,42 @@ const store = {
   },
   set(key, value) {
     try { localStorage.setItem(key, JSON.stringify(value)); } catch { /* storage unavailable */ }
+    prefsChanged();
   },
 };
+
+// Desktop app: the page origin changes at each launch (a new port), so localStorage starts empty.
+// Copy the rs.* keys to the server; it puts them back into the next page (see src/prefs.rs).
+let prefsTimer = null;
+function prefsChanged() {
+  try { if (!state.info?.desktop) return; } catch { return; }
+  clearTimeout(prefsTimer);
+  prefsTimer = setTimeout(syncPrefs, 400);
+}
+function prefsSnapshot() {
+  const items = {};
+  try {
+    for (let i = 0; i < localStorage.length; i++) {
+      const k = localStorage.key(i);
+      if (k.startsWith('rs.') && k !== 'rs.__rev') items[k] = localStorage.getItem(k);
+    }
+  } catch { /* storage unavailable */ }
+  return items;
+}
+async function syncPrefs() {
+  prefsTimer = null;
+  try {
+    const { rev } = await api('/prefs', { method: 'PUT', body: { items: prefsSnapshot() } });
+    localStorage.setItem('rs.__rev', String(rev));
+  } catch { /* the next change tries again */ }
+}
+// A change in the last moment before the window closes.
+window.addEventListener('pagehide', () => {
+  if (!prefsTimer) return;
+  clearTimeout(prefsTimer);
+  prefsTimer = null;
+  fetch('/api/prefs', { method: 'PUT', keepalive: true, headers: { 'content-type': 'application/json' }, body: JSON.stringify({ items: prefsSnapshot() }) }).catch(() => {});
+});
 
 async function api(path, { method, body, signal } = {}) {
   let res;

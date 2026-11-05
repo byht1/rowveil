@@ -7,6 +7,7 @@ pub mod data;
 pub mod ddl;
 pub mod db;
 pub mod kv;
+pub mod prefs;
 pub mod queries;
 pub mod schema;
 pub mod update;
@@ -70,6 +71,8 @@ struct AppState {
     env_tags: PathBuf,
     queries: RwLock<Vec<queries::SavedQuery>>,
     queries_path: PathBuf,
+    prefs: RwLock<prefs::Prefs>,
+    prefs_path: PathBuf,
     read_only: bool,
     auth: Option<String>,
     app_token: Option<String>,
@@ -303,6 +306,38 @@ async fn update_connection(State(st): State<Shared>, Path(id): Path<String>, Jso
         config::save_user_connections(&st.store, &conns)?;
     }
     Ok(Json(json!(info)))
+}
+
+// ---------------------------------------------------------------- UI preferences (desktop)
+
+/// The page. In the desktop app it carries the saved UI preferences (see `prefs`).
+async fn index_page(State(st): State<Shared>) -> Response {
+    #[cfg(debug_assertions)]
+    let html = std::fs::read_to_string(concat!(env!("CARGO_MANIFEST_DIR"), "/static/index.html"))
+        .unwrap_or_else(|_| include_str!("../static/index.html").to_string());
+    #[cfg(not(debug_assertions))]
+    let html = include_str!("../static/index.html").to_string();
+    let html = if st.app_token.is_some() { prefs::inject(&html, &*st.prefs.read().await) } else { html };
+    ([(header::CONTENT_TYPE, "text/html; charset=utf-8"), (header::CACHE_CONTROL, "no-cache")], html).into_response()
+}
+
+async fn get_prefs(State(st): State<Shared>) -> Json<prefs::Prefs> {
+    Json(st.prefs.read().await.clone())
+}
+
+#[derive(Deserialize)]
+struct PrefsUpdate {
+    items: std::collections::BTreeMap<String, String>,
+}
+
+/// Replaces all preferences. Returns the new revision.
+async fn put_prefs(State(st): State<Shared>, Json(req): Json<PrefsUpdate>) -> ApiResult<Json<Value>> {
+    let items = prefs::check(req.items).map_err(bad)?;
+    let mut p = st.prefs.write().await;
+    let next = prefs::Prefs { rev: p.rev + 1, items };
+    prefs::save(&st.prefs_path, &next).map_err(|e| ApiError(StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
+    *p = next;
+    Ok(Json(json!({ "rev": p.rev })))
 }
 
 // ---------------------------------------------------------------- saved queries
@@ -771,6 +806,7 @@ pub fn router(opts: &Options) -> (Router, PathBuf) {
     let store = config::store_path(&opts.data_dir);
     let env_tags = config::env_tags_path(&opts.data_dir);
     let queries_path = queries::store_path(&opts.data_dir);
+    let prefs_path = prefs::store_path(&opts.data_dir);
     let mut conns = config::env_connections(opts.url.as_deref());
     let overrides = config::load_env_tag_overrides(&env_tags);
     for c in &mut conns {
@@ -792,6 +828,8 @@ pub fn router(opts: &Options) -> (Router, PathBuf) {
         env_tags,
         queries: RwLock::new(queries::load(&queries_path)),
         queries_path,
+        prefs: RwLock::new(prefs::load(&prefs_path)),
+        prefs_path,
         read_only: opts.read_only,
         auth,
         app_token: opts.app_token.clone(),
@@ -821,6 +859,7 @@ pub fn router(opts: &Options) -> (Router, PathBuf) {
         .route("/connections/{id}/redis/command", post(redis_command))
         .route("/queries", get(list_queries).post(add_query))
         .route("/queries/{id}", axum::routing::delete(delete_query).patch(update_query))
+        .route("/prefs", get(get_prefs).put(put_prefs))
         .route("/update/check", get(update_check))
         .route("/update/download", post(update_download))
         .route("/update/progress", get(update_progress))
@@ -829,7 +868,7 @@ pub fn router(opts: &Options) -> (Router, PathBuf) {
         .route("/desktop/reveal", post(desktop_reveal));
 
     let app = Router::new()
-        .route("/", asset!("index.html", "text/html; charset=utf-8"))
+        .route("/", get(index_page))
         .route("/app.js", asset!("app.js", "text/javascript; charset=utf-8"))
         .route("/redis.js", asset!("redis.js", "text/javascript; charset=utf-8"))
         .route("/style.css", asset!("style.css", "text/css; charset=utf-8"))

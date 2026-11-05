@@ -69,7 +69,7 @@ Database explorer & query tool. Окремий десктопний застос
 | Debian / Ubuntu | `rowveil-linux-amd64.deb` | `sudo apt install ./rowveil-linux-amd64.deb` |
 | Інший Linux | `rowveil-linux-x86_64.tar.gz` | Потрібні WebKitGTK 4.1 і GTK 3 (див. `README.txt` в архіві) |
 
-Де зберігаються дані (`connections.json` — підключення, паролі в URL відкритим текстом; `window.json`; `rowveil.log`; `webview/`):
+Де зберігаються дані (`connections.json` — підключення, паролі в URL відкритим текстом; `ui-prefs.json` — тема, вкладки, історія; `window.json`; `rowveil.log`; `webview/`):
 
 | Система | Папка |
 |---|---|

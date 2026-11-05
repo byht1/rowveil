@@ -69,7 +69,7 @@ Builds are on the [Releases](https://github.com/byht1/rowveil/releases/latest) p
 | Debian / Ubuntu | `rowveil-linux-amd64.deb` | `sudo apt install ./rowveil-linux-amd64.deb` |
 | Other Linux | `rowveil-linux-x86_64.tar.gz` | Needs WebKitGTK 4.1 and GTK 3 (see `README.txt` in the archive) |
 
-Where data is kept (`connections.json`: connections, passwords in URLs as plain text; `window.json`; `rowveil.log`; `webview/`):
+Where data is kept (`connections.json`: connections, passwords in URLs as plain text; `ui-prefs.json`: theme, tabs, history; `window.json`; `rowveil.log`; `webview/`):
 
 | System | Folder |
 |---|---|

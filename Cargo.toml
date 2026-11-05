@@ -1,6 +1,6 @@
 [package]
 name = "rowveil"
-version = "0.4.3"
+version = "0.4.4"
 edition = "2021"
 description = "Rowveil: database explorer and query tool for PostgreSQL, MySQL, SQLite, Redis and BigQuery"
 license = "MIT"

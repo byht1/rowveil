@@ -1,4 +1,4 @@
-Rowveil 0.4.4 fixes the desktop app: the theme and other UI settings now stay after a restart.
+Rowveil 0.4.5 adds **right-click menus** for tables and columns.
 
 ## Downloads
 
@@ -14,12 +14,11 @@ Rowveil 0.4.4 fixes the desktop app: the theme and other UI settings now stay af
 
 ## What's new
 
-- **Fix: UI settings after a restart (desktop app).** Earlier, the desktop app lost the theme, the open tabs, the SQL history, the tag filter and the start page option at each launch. Now the app keeps them in `ui-prefs.json` in the data folder. Settings that were lost before do not come back: choose the theme once more after the update.
-- **From 0.4.3.**
-  - A start page with all connections, search and a tag filter. **All connections** in the connection menu goes back to it.
-  - Drag the edge of a column header in SQL results to change the column width.
-  - Windows: no terminal window flashes when Rowveil checks for updates.
-- **Updates.** Rowveil 0.4.0 – 0.4.3 offer this version through the **Update** button in the sidebar footer.
+- **Right-click a table** in the sidebar:
+  - **New SQL: SELECT … FROM** opens a SQL tab with `SELECT  FROM <table>`. The cursor stands between `SELECT` and `FROM`, and the column suggestions open (`Tab` inserts one).
+  - **Open in a new tab**, **Copy name**, and **Copy schema.table**.
+- **Right-click a column header** in the table view or in SQL results: **Copy column name**.
+- **Updates.** Rowveil 0.4.0 – 0.4.4 offer this version through the **Update** button in the sidebar footer.
 
 ## Where your data is stored
 

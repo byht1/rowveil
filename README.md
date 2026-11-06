@@ -34,6 +34,7 @@ Supports **PostgreSQL**, **MySQL / MariaDB**, **SQLite**, **Redis / Valkey** and
   - Run menu: "Run all" and "Explain"; Prettify (`Shift+Alt+F`);
   - VS Code shortcuts: `Alt+↑/↓`, `Shift+Alt+↑/↓`, `Ctrl+D`, `Ctrl+Shift+L`, `Ctrl+/`, `Ctrl+Shift+K`, `Ctrl+L`, `Alt+Click`, `Ctrl+F` and more (the keyboard button in the toolbar lists them all);
   - highlighting, autocomplete (tables, columns, aliases, keywords, dialect functions; `Tab` or `Enter` accepts a suggestion), line numbers, folding, history;
+  - right-click a table: a `SELECT … FROM` template, copy the name; right-click a column header: copy the column name;
   - saved queries (`Ctrl+S`): for one connection or for all connections of the dialect, listed in the sidebar;
   - results as a table or JSON, several result sets, resize and hide columns, copy, CSV / JSON export.
 - CSV / JSON export (the current page or all filtered rows, up to 10,000).

@@ -588,6 +588,7 @@ function renderTableList() {
       title: `${t.schema}.${t.name}`,
       onclick: (e) => openTable(t.schema, t.name, { newTab: e.ctrlKey || e.metaKey }),
       onauxclick: (e) => { if (e.button === 1) openTable(t.schema, t.name, { newTab: true }); },
+      oncontextmenu: (e) => tableContextMenu(e, t),
     },
     icon(t.kind === 'table' ? 'table' : 'view'),
     h('span', { class: 'sb-name' }, t.name),
@@ -595,6 +596,31 @@ function renderTableList() {
     ));
   }
 }
+
+// ---------------------------------------------------------------- context menus
+/** Opens a menu at the mouse pointer. items: [{ icon, label, run }] or null (skipped). */
+function contextMenu(e, items) {
+  e.preventDefault();
+  e.stopPropagation();
+  const at = { getBoundingClientRect: () => ({ left: e.clientX, bottom: e.clientY - 4 }) };
+  openMenu(at, items.filter(Boolean).map((it) => h('div', { class: 'menu-item', onclick: () => { closeMenu(); it.run(); } },
+    icon(it.icon), h('span', {}, it.label))), 'ctx-menu');
+  // Near the bottom edge, open the menu upwards.
+  if (menuEl && e.clientY + menuEl.offsetHeight + 8 > window.innerHeight) menuEl.style.top = `${Math.max(8, e.clientY - menuEl.offsetHeight)}px`;
+}
+
+function tableContextMenu(e, t) {
+  const full = state.schema.dialect !== 'sqlite' && t.schema ? `${t.schema}.${t.name}` : null;
+  contextMenu(e, [
+    // The cursor stands between SELECT and FROM, and the column suggestions open.
+    { icon: 'terminal', label: 'New SQL: SELECT … FROM', run: () => openSqlTab(`SELECT  FROM ${acTableText(t)}`, 7) },
+    { icon: 'expand', label: 'Open in a new tab', run: () => openTable(t.schema, t.name, { newTab: true }) },
+    { icon: 'copy', label: 'Copy name', run: () => copyText(t.name) },
+    full ? { icon: 'copy', label: `Copy ${full}`, run: () => copyText(full) } : null,
+  ]);
+}
+
+const columnContextMenu = (e, name) => contextMenu(e, [{ icon: 'copy', label: 'Copy column name', run: () => copyText(name) }]);
 
 function compact(n) {
   if (n < 1000) return String(n);
@@ -1368,11 +1394,18 @@ function openTable(schema, table, { newTab = false, filters = null } = {}) {
   activate(tab.id);
 }
 
-function openSqlTab(sql = '') {
+function openSqlTab(sql = '', cursor = null) {
   const t = newSqlTab(null, sql);
   state.tabs.push(t);
   activate(t.id);
-  setTimeout(() => t.cm?.focus(), 0);
+  setTimeout(() => {
+    if (!t.cm) return;
+    t.cm.focus();
+    if (cursor != null) {
+      t.cm.dispatch({ selection: { anchor: cursor } });
+      CM.startCompletion(t.cm);
+    }
+  }, 0);
 }
 
 function globalKeys(e) {
@@ -1707,6 +1740,7 @@ function renderGrid(tab, meta) {
           if (e.target.classList.contains('resizer')) return;
           toggleSort(tab, c.name, e.shiftKey);
         },
+        oncontextmenu: (e) => columnContextMenu(e, c.name),
       },
       h('div', { class: 'th-inner' },
         c.primary ? h('span', { class: 'pk', title: 'Primary key' }, icon('key', 11)) : null,
@@ -2894,7 +2928,7 @@ function staticGrid(res, vis = res.columns.map((c, i) => i), widths = null) {
   const shown = vis.map((i) => cols[i]);
   const table = h('table', { class: 'grid' },
     h('colgroup', {}, h('col', { style: { width: '56px' } }), shown.map((c) => h('col', { style: { width: `${widths?.[c.name] || defaultWidth({ kind: c.kind, name: c.name })}px` } }))),
-    h('thead', {}, h('tr', {}, h('th', { class: 'rownum' }, '#'), shown.map((c) => h('th', { title: `${c.name} ${c.type}` },
+    h('thead', {}, h('tr', {}, h('th', { class: 'rownum' }, '#'), shown.map((c) => h('th', { title: `${c.name} ${c.type}`, oncontextmenu: (e) => columnContextMenu(e, c.name) },
       h('div', { class: 'th-inner' }, h('span', { class: 'th-name' }, c.name), h('span', { class: 'th-type' }, c.type.toLowerCase())),
       widths ? h('div', { class: 'resizer', onmousedown: (e) => startResize(e, widths, c.name) }) : null)))),
     h('tbody', {}, res.rows.map((row, i) => h('tr', {}, h('td', { class: 'rownum' }, h('span', { class: 'rn' }, String(i + 1))),

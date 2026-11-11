@@ -261,6 +261,7 @@ async fn add_connection(State(st): State<Shared>, Json(body): Json<NewConnection
         read_only: body.read_only,
         tags: config::normalize_tags(&body.tags),
         source: "user".into(),
+        scan_limit: None,
     };
     st.pools.lock().await.insert(cfg.id.clone(), db);
     let mut conns = st.conns.write().await;
@@ -275,6 +276,7 @@ struct ConnectionPatch {
     name: Option<String>,
     tags: Option<Vec<String>>,
     read_only: Option<bool>,
+    scan_limit: Option<u32>,
 }
 
 /// Renames a saved connection or changes its tags / read-only flag. Connections from the
@@ -283,7 +285,7 @@ async fn update_connection(State(st): State<Shared>, Path(id): Path<String>, Jso
     let mut conns = st.conns.write().await;
     let c = conns.iter_mut().find(|c| c.id == id).ok_or_else(|| not_found("Connection"))?;
     let env = c.source == "env";
-    if env && (p.name.is_some() || p.read_only.is_some()) {
+    if env && (p.name.is_some() || p.read_only.is_some() || p.scan_limit.is_some()) {
         return Err(ApiError(StatusCode::BAD_REQUEST, "Connections from environment variables accept only tags".into()));
     }
     if let Some(name) = p.name {
@@ -295,6 +297,16 @@ async fn update_connection(State(st): State<Shared>, Path(id): Path<String>, Jso
     }
     if let Some(ro) = p.read_only {
         c.read_only = ro;
+    }
+    if let Some(n) = p.scan_limit {
+        if !config::SCAN_LIMIT_RANGE.contains(&n) {
+            return Err(bad(format!(
+                "Keys per scan: enter a number from {} to {}",
+                config::SCAN_LIMIT_RANGE.start(),
+                config::SCAN_LIMIT_RANGE.end()
+            )));
+        }
+        c.scan_limit = (n != config::SCAN_LIMIT_DEFAULT).then_some(n);
     }
     if let Some(tags) = p.tags {
         c.tags = config::normalize_tags(&tags);

@@ -35,6 +35,7 @@ export function createRedisUI(ctx) {
       keys: [],
       cursor: '0',
       done: false,
+      scanned: 0,
       loading: false,
       error: null,
       open: new Set(saved.open || []),
@@ -65,16 +66,18 @@ export function createRedisUI(ctx) {
     return /[*?[]/.test(t) ? t : `*${t}*`;
   }
 
-  // Enough matches to stop scanning automatically while a filter is active.
-  const AUTO_MATCHES = 200;
+  // One pass walks this many keys (a connection setting); "Next" walks the next pass.
+  const scanLimit = () => state.connections.find((c) => c.id === cid())?.scanLimit || 10000;
+  // Keys per request: small requests keep each round trip short on a large keyspace.
+  const SCAN_STEP = 1000;
   const filtering = (r) => !!(r.pattern.trim() || r.type);
   const byKey = (a, b) => (a.exact !== b.exact ? (a.exact ? -1 : 1) : a.key < b.key ? -1 : a.key > b.key ? 1 : 0);
 
   /**
    * Loads keys with SCAN. `reset` starts over (a new filter or database) and always runs, even
    * while another scan is in flight: the generation number makes the older response stale.
-   * "Load more" (`reset = false`) is ignored while a scan runs.
-   * With a filter, it keeps scanning until it has AUTO_MATCHES keys or the keyspace ends.
+   * "Next" (`reset = false`) is ignored while a scan runs.
+   * One pass walks scanLimit() keys of the keyspace (with or without a filter), then stops.
    * Only the key list and the counter are redrawn, so the filter input keeps focus.
    */
   async function scan(reset = false) {
@@ -85,7 +88,7 @@ export function createRedisUI(ctx) {
       r.gen = (r.gen || 0) + 1;
       // Cancel the older request, so the server stops its SCAN loop and frees the connection.
       r.abort?.abort();
-      r.keys = []; r.cursor = '0'; r.done = false; r.error = null; r.collapsed.clear();
+      r.keys = []; r.cursor = '0'; r.done = false; r.error = null; r.scanned = 0; r.collapsed.clear();
     }
     const ctrl = new AbortController();
     r.abort = ctrl;
@@ -94,23 +97,28 @@ export function createRedisUI(ctx) {
     r.loading = true;
     updateKeys();
     const text = r.pattern.trim();
+    const limit = scanLimit();
+    let walked = 0;
     try {
       do {
+        const step = Math.min(SCAN_STEP, limit - walked);
         const res = await api(`/connections/${cid()}/redis/scan`, {
           body: {
-            db, pattern: globPattern(r.pattern), cursor: r.cursor, count: 500, type: r.type || null,
+            db, pattern: globPattern(r.pattern), cursor: r.cursor, count: step, type: r.type || null, single: true,
             exact: r.cursor === '0' && text && !/[*?[]/.test(text) ? text : null,
           },
           signal: ctrl.signal,
         });
+        walked += step;
         if (gen !== r.gen || rs() !== r) return; // a newer scan replaced this one
         const seen = new Set(r.keys.map((k) => k.key));
         for (const k of res.keys) if (!seen.has(k.key)) r.keys.push(k);
         r.keys.sort(byKey);
         r.cursor = res.cursor;
         r.done = res.cursor === '0';
+        r.scanned += step;
         updateKeys();
-      } while (filtering(r) && !r.done && r.keys.length < AUTO_MATCHES);
+      } while (!r.done && walked < limit);
     } catch (e) {
       if (gen !== r.gen || e?.name === 'AbortError') return;
       r.error = e.message;
@@ -133,6 +141,13 @@ export function createRedisUI(ctx) {
     const n = fmtNum(r.keys.length);
     if (r.done) return `${n} found`;
     return r.loading ? `Scanning… ${n} found` : `${n}+ found`;
+  }
+
+  /** "~20,000 of 1,234,567 keys scanned" (SCAN COUNT is a hint, so the number is approximate). */
+  function scannedText(r) {
+    const total = keyCount(r.db);
+    const s = Math.min(r.scanned, total || r.scanned);
+    return total ? `~${fmtNum(s)} of ${fmtNum(total)} keys scanned` : `~${fmtNum(s)} keys scanned`;
   }
 
   async function reloadKeys() {
@@ -201,6 +216,7 @@ export function createRedisUI(ctx) {
     if (r.error) { list.append(h('div', { class: 'sb-empty small error' }, r.error)); return; }
     if (!r.keys.length && r.loading) { list.append(h('div', { class: 'sb-empty small' }, h('span', { class: 'spinner' }), filtering(r) ? ' Searching…' : ' Scanning…')); return; }
     if (!r.keys.length && r.done) { list.append(h('div', { class: 'sb-empty small' }, r.pattern || r.type ? 'No matching keys' : 'This database is empty')); }
+    else if (!r.keys.length && !r.loading) list.append(h('div', { class: 'sb-empty small' }, 'No matching keys in this part. Click "Next" to scan further.'));
     // The exact key (the filter names it literally) comes first, outside the tree.
     const exact = r.keys.filter((k) => k.exact);
     for (const k of exact) list.append(keyButton(k, k.key, 0));
@@ -208,8 +224,10 @@ export function createRedisUI(ctx) {
     if (r.tree) renderTree(list, { ...r, keys: rest });
     else for (const k of rest) list.append(keyButton(k, k.key, 0));
     if (!r.done) {
-      list.append(h('button', { class: 'btn ghost sm r-more', disabled: r.loading, onclick: () => scan(false) },
-        r.loading ? h('span', { class: 'spinner' }) : null, r.loading ? 'Scanning…' : 'Load more keys'));
+      list.append(h('div', { class: 'r-next' },
+        h('span', { class: 'muted small' }, scannedText(r)),
+        h('button', { class: 'btn ghost sm r-more', disabled: r.loading, title: 'Scan the next part of the keyspace', onclick: () => scan(false) },
+          r.loading ? h('span', { class: 'spinner' }) : null, r.loading ? 'Scanning…' : `Next ${fmtNum(scanLimit())}`)));
     }
   }
 

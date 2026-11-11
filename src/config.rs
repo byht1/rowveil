@@ -19,7 +19,14 @@ pub struct ConnConfig {
     /// "env" (from environment / CLI, not persisted) or "user".
     #[serde(default = "user_source")]
     pub source: String,
+    /// Redis: how many keys one pass of the key browser scans (None: SCAN_LIMIT_DEFAULT).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub scan_limit: Option<u32>,
 }
+
+/// Redis key browser: keys per pass by default, and the allowed range.
+pub const SCAN_LIMIT_DEFAULT: u32 = 10_000;
+pub const SCAN_LIMIT_RANGE: std::ops::RangeInclusive<u32> = 100..=1_000_000;
 
 fn user_source() -> String {
     "user".into()
@@ -35,6 +42,7 @@ pub struct ConnInfo {
     pub read_only: bool,
     pub source: String,
     pub tags: Vec<String>,
+    pub scan_limit: u32,
 }
 
 /// Cleans user input: trimmed, upper case, no duplicates, at most 8 tags of 24 characters.
@@ -67,6 +75,7 @@ impl ConnConfig {
             read_only: self.read_only || global_read_only,
             source: self.source.clone(),
             tags: self.tags.clone(),
+            scan_limit: self.scan_limit.unwrap_or(SCAN_LIMIT_DEFAULT),
         }
     }
 }
@@ -116,6 +125,7 @@ pub fn env_connections(cli_url: Option<&str>) -> Vec<ConnConfig> {
             read_only: false,
             tags: env_tags("DATABASE_TAGS"),
             source: "env".into(),
+            scan_limit: None,
         });
     }
     let mut extra: Vec<(String, String)> = std::env::vars()
@@ -131,6 +141,7 @@ pub fn env_connections(cli_url: Option<&str>) -> Vec<ConnConfig> {
             url,
             read_only: false,
             source: "env".into(),
+            scan_limit: None,
         });
     }
     out

@@ -754,12 +754,16 @@ function openEditConnection(c) {
   const ro = h('input', { type: 'checkbox', checked: c.readOnly, disabled: env || state.info?.readOnly });
   const tags = tagEditor(c.tags || []);
   const status = h('div', { class: 'form-status' });
+  const isRedisConn = c.dialect === 'redis';
+  const scanLimit = isRedisConn ? h('input', { class: 'input', type: 'number', min: '100', max: '1000000', step: '1000', value: String(c.scanLimit || 10000), disabled: env }) : null;
   const body = h('div', { class: 'form' },
     h('label', {}, 'Name', name),
     h('label', {}, 'Connection URL', h('div', { class: 'url-preview mono' }, c.url)),
     h('label', {}, 'Tags', tags.dom),
     env ? h('div', { class: 'hint' }, 'This connection comes from an environment variable: only its tags can change here. You can also set them with ', h('code', {}, `DATABASE_TAGS_${c.id.replace(/^env-/, '').toUpperCase()}`), '.') : null,
     h('label', { class: 'check' }, ro, 'Read-only (block data changes)'),
+    isRedisConn ? h('label', {}, 'Keys per scan', scanLimit,
+      h('span', { class: 'hint' }, 'The key list and the key search walk this many keys at a time; "Next" continues. Default: 10000.')) : null,
     status);
   const save = h('button', {
     class: 'btn primary', onclick: async () => {
@@ -767,11 +771,12 @@ function openEditConnection(c) {
       try {
         const patch = { tags: tags.value() };
         if (!env) { patch.name = name.value; patch.readOnly = ro.checked; }
+        if (isRedisConn && !env) patch.scanLimit = Number(scanLimit.value);
         const updated = await api(`/connections/${c.id}`, { method: 'PATCH', body: patch });
         const i = state.connections.findIndex((x) => x.id === c.id);
         if (i >= 0) state.connections[i] = updated;
         close();
-        if (c.id === state.connId && !env && updated.readOnly !== c.readOnly) selectConnection(c.id, true);
+        if (c.id === state.connId && !env && (updated.readOnly !== c.readOnly || updated.scanLimit !== c.scanLimit)) selectConnection(c.id, true);
         else render();
         toast('Connection saved', 'success');
       } catch (e) { status.textContent = e.message; status.className = 'form-status error'; save.disabled = false; }

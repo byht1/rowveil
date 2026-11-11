@@ -139,7 +139,7 @@ impl Redis {
         }
         // A filter matches few keys per SCAN step, so each step walks more of the keyspace
         // (one round trip over a VPN costs ~100 ms).
-        let step = if pattern != "*" || type_filter.is_some() { SCAN_STEP_FILTERED } else { want.max(200) };
+        let step = if req.single { want } else if pattern != "*" || type_filter.is_some() { SCAN_STEP_FILTERED } else { want.max(200) };
         // SCAN may return few keys per call: loop until the page is full or the scan ends,
         // but never longer than about a second.
         let started = std::time::Instant::now();
@@ -152,7 +152,7 @@ impl Redis {
             let (next, batch): (u64, Vec<Vec<u8>>) = cmd.query_async(&mut c).await?;
             keys.extend(batch.into_iter().filter(|k| exact.as_ref() != Some(k)));
             cursor = next;
-            if cursor == 0 || keys.len() >= want || started.elapsed() > Duration::from_millis(1200) {
+            if req.single || cursor == 0 || keys.len() >= want || started.elapsed() > Duration::from_millis(1200) {
                 break;
             }
         }
@@ -764,6 +764,9 @@ pub struct ScanRequest {
     /// A literal key to check with EXISTS on the first page (the filter text without globs).
     #[serde(default)]
     pub exact: Option<String>,
+    /// One SCAN call with COUNT = `count` (the UI walks the keyspace in steps it controls).
+    #[serde(default)]
+    pub single: bool,
 }
 
 fn default_count() -> i64 {

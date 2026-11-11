@@ -1,4 +1,4 @@
-Rowveil 0.4.5 adds **right-click menus** for tables and columns.
+Rowveil 0.4.6 makes the **Redis key list** work on large databases: it scans keys in parts, with a **Next** button.
 
 ## Downloads
 
@@ -14,11 +14,11 @@ Rowveil 0.4.5 adds **right-click menus** for tables and columns.
 
 ## What's new
 
-- **Right-click a table** in the sidebar:
-  - **New SQL: SELECT … FROM** opens a SQL tab with `SELECT  FROM <table>`. The cursor stands between `SELECT` and `FROM`, and the column suggestions open (`Tab` inserts one).
-  - **Open in a new tab**, **Copy name**, and **Copy schema.table**.
-- **Right-click a column header** in the table view or in SQL results: **Copy column name**.
-- **Updates.** Rowveil 0.4.0 – 0.4.4 offer this version through the **Update** button in the sidebar footer.
+- **Redis: keys load in parts.** One pass scans 10,000 keys, in requests of 1,000 keys. This stops "timed out" errors on a large Redis.
+  - Below the list: "~10,000 of 1,234,567 keys scanned" and a **Next 10,000** button that scans the next part.
+  - A search (`user:*`, `*order*`) works the same way: one pass, then **Next**.
+  - Change the number in **Edit name and tags → Keys per scan** (100 – 1,000,000) for a connection you added.
+- **Updates.** Rowveil 0.4.0 – 0.4.5 offer this version through the **Update** button in the sidebar footer.
 
 ## Where your data is stored
 

@@ -1,4 +1,4 @@
-Rowveil 0.4.6 makes the **Redis key list** work on large databases: it scans keys in parts, with a **Next** button.
+Rowveil 0.4.7 improves the **Redis key search** and the **JSON editor**.
 
 ## Downloads
 
@@ -14,11 +14,9 @@ Rowveil 0.4.6 makes the **Redis key list** work on large databases: it scans key
 
 ## What's new
 
-- **Redis: keys load in parts.** One pass scans 10,000 keys, in requests of 1,000 keys. This stops "timed out" errors on a large Redis.
-  - Below the list: "~10,000 of 1,234,567 keys scanned" and a **Next 10,000** button that scans the next part.
-  - A search (`user:*`, `*order*`) works the same way: one pass, then **Next**.
-  - Change the number in **Edit name and tags → Keys per scan** (100 – 1,000,000) for a connection you added.
-- **Updates.** Rowveil 0.4.0 – 0.4.5 offer this version through the **Update** button in the sidebar footer.
+- **Redis: search without `*` scans all keys.** Plain text (`order`, `user:42`) finds every matching key in one pass. A search with `*` (`user:*`) still scans in parts with the **Next** button.
+- **Redis: JSON folds stay after Save.** The folded blocks and the scroll position of a JSON value do not reset when you save it.
+- **Updates.** Rowveil 0.4.0 – 0.4.6 offer this version through the **Update** button in the sidebar footer. A stable install never offers a pre-release (alpha, beta).
 
 ## Where your data is stored
 

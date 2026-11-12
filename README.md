@@ -44,7 +44,7 @@ Supports **PostgreSQL**, **MySQL / MariaDB**, **SQLite**, **Redis / Valkey** and
 ### Redis
 
 - URL: `redis://[user:password@]host:6379/0`, TLS: `rediss://`; `valkey://` also works. The connection form has host, port, user (ACL, optional), password, database number and TLS.
-- Sidebar: database picker (`db0…db15` with key counts), glob filter (`user:*`; plain text matches anywhere in the key), type filter, a tree grouped by `:` or a flat list. Keys load with `SCAN` in small batches. One pass scans 10,000 keys (the **Keys per scan** connection setting); **Next** scans the next part, also for a search.
+- Sidebar: database picker (`db0…db15` with key counts), glob filter (`user:*`; plain text matches anywhere in the key), type filter, a tree grouped by `:` or a flat list. Keys load with `SCAN` in small batches. One pass scans 10,000 keys (the **Keys per scan** connection setting); **Next** scans the next part. A search without `*` scans all keys at once.
 - View and edit by type: string (text or JSON editor), hash, list, set, sorted set, stream (entries, consumer groups), RedisJSON documents. Large collections load in pages (`HSCAN` / `SSCAN` / `LRANGE` / `ZRANGE`).
 - TTL (change or `PERSIST`), rename (`RENAMENX`), delete (`UNLINK`), new keys of any type.
 - A redis-cli style console: replies printed like redis-cli, `↑/↓` history, one command per line, saved commands (`Ctrl+S`). A read-only connection runs read commands only.

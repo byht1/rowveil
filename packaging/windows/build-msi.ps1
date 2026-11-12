@@ -7,6 +7,8 @@ $ErrorActionPreference = 'Stop'
 $root = (Resolve-Path "$PSScriptRoot\..\..").Path
 $version = (Select-String -Path "$root\Cargo.toml" -Pattern '^version\s*=\s*"([^"]+)"' | Select-Object -First 1).Matches[0].Groups[1].Value
 $out = "$root\target\release\Rowveil-$version-x64.msi"
+# MSI versions are numbers only: 0.5.0-alpha.1 installs as 0.5.0.
+$msiVersion = $version -replace '-.*$', ''
 
 foreach ($exe in 'rowveil.exe', 'rowveil-server.exe') {
     if (-not (Test-Path "$root\target\release\$exe")) { throw "target\release\$exe not found: run 'cargo build --release' first" }
@@ -20,7 +22,7 @@ try {
         if (-not ($have -match $ext)) { wix extension add -g "$ext/5.0.2" }
     }
     wix build "$PSScriptRoot\rowveil.wxs" -arch x64 -ext WixToolset.UI.wixext `
-        -d "Version=$version" -d "Root=$root" -o $out
+        -d "Version=$msiVersion" -d "Root=$root" -o $out
     if ($LASTEXITCODE -ne 0) { throw "wix build failed ($LASTEXITCODE)" }
 } finally { Pop-Location }
 

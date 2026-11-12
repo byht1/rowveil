@@ -85,10 +85,18 @@ pub fn current_version() -> &'static str {
 }
 
 /// `1.10.0` > `1.9.3`; a pre-release (`1.0.0-rc1`) is older than the release.
+/// A pre-release (alpha, beta, rc: a version with "-") is offered only to a pre-release
+/// install. A stable install gets stable versions only, even when GitHub marks a
+/// pre-release as the latest release by mistake.
+pub fn offers_update(candidate: &str, current: &str) -> bool {
+    let pre = |v: &str| v.contains('-');
+    is_newer(candidate, current) && (!pre(candidate) || pre(current))
+}
+
 pub fn is_newer(candidate: &str, current: &str) -> bool {
-    fn parse(v: &str) -> (Vec<u64>, bool) {
+    fn parse(v: &str) -> (Vec<u64>, Option<&str>) {
         let v = v.trim().trim_start_matches(['v', 'V']);
-        let (main, pre) = v.split_once('-').map(|(m, p)| (m, !p.is_empty())).unwrap_or((v, false));
+        let (main, pre) = v.split_once('-').map(|(m, p)| (m, Some(p).filter(|p| !p.is_empty()))).unwrap_or((v, None));
         (main.split('.').map(|x| x.parse().unwrap_or(0)).collect(), pre)
     }
     let (a, a_pre) = parse(candidate);
@@ -99,7 +107,32 @@ pub fn is_newer(candidate: &str, current: &str) -> bool {
             return x > y;
         }
     }
-    !a_pre && b_pre
+    match (a_pre, b_pre) {
+        (None, Some(_)) => true,
+        (Some(x), Some(y)) => pre_cmp(x, y).is_gt(),
+        _ => false,
+    }
+}
+
+/// Orders pre-release labels like semver: "alpha.2" < "alpha.10" < "beta.1".
+fn pre_cmp(a: &str, b: &str) -> std::cmp::Ordering {
+    let (mut a, mut b) = (a.split('.'), b.split('.'));
+    loop {
+        let ord = match (a.next(), b.next()) {
+            (None, None) => return std::cmp::Ordering::Equal,
+            (None, Some(_)) => return std::cmp::Ordering::Less,
+            (Some(_), None) => return std::cmp::Ordering::Greater,
+            (Some(x), Some(y)) => match (x.parse::<u64>(), y.parse::<u64>()) {
+                (Ok(x), Ok(y)) => x.cmp(&y),
+                (Ok(_), Err(_)) => std::cmp::Ordering::Less,
+                (Err(_), Ok(_)) => std::cmp::Ordering::Greater,
+                (Err(_), Err(_)) => x.cmp(y),
+            },
+        };
+        if ord.is_ne() {
+            return ord;
+        }
+    }
 }
 
 impl Updater {
@@ -144,7 +177,7 @@ impl Updater {
             }
         };
         let method = self.method();
-        let available = is_newer(&release.version, current_version());
+        let available = offers_update(&release.version, current_version());
         let asset = method.asset().and_then(|a| release.assets.iter().find(|x| x.0 == a));
         Ok(serde_json::json!({
             "current": current_version(),
@@ -204,7 +237,7 @@ impl Updater {
             Some((_, r)) => r,
             None => self.fetch_release().await?,
         };
-        if !is_newer(&release.version, current_version()) {
+        if !offers_update(&release.version, current_version()) {
             bail!("Rowveil {} is the latest version", current_version());
         }
         let (_, url, size) = release.assets.iter().find(|a| a.0 == asset_name).cloned().ok_or_else(|| anyhow!("The release has no {asset_name}"))?;
@@ -515,6 +548,17 @@ mod tests {
         assert!(!is_newer("0.3.0", "0.3.0"));
         assert!(!is_newer("0.2.9", "0.3.0"));
         assert!(is_newer("0.3.1", "0.3"));
+    }
+
+    #[test]
+    fn stable_installs_skip_prereleases() {
+        assert!(!offers_update("0.5.0-alpha.1", "0.4.7"));
+        assert!(offers_update("0.4.8", "0.4.7"));
+        assert!(offers_update("0.5.0-alpha.2", "0.5.0-alpha.1"));
+        assert!(offers_update("0.5.0-alpha.10", "0.5.0-alpha.9"));
+        assert!(offers_update("0.5.0-beta.1", "0.5.0-alpha.9"));
+        assert!(!offers_update("0.5.0-alpha.1", "0.5.0-alpha.1"));
+        assert!(offers_update("0.5.0", "0.5.0-alpha.2"));
     }
 
     #[test]

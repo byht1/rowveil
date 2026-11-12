@@ -1,6 +1,8 @@
 name: Release
 
 # Push a tag (v1.2.3) to build every platform and publish a release with the files.
+# A tag with a pre-release suffix (v1.2.3-alpha.1) is published as a pre-release: GitHub's
+# "latest release" (the updater's feed) skips it, so stable installs never get it.
 # Run it by hand (workflow_dispatch) to only build and keep the files as workflow artifacts.
 on:
   push:
@@ -125,4 +127,7 @@ jobs:
             gh release create "$TAG" --draft --title "Rowveil ${TAG#v}" --notes-file packaging/release-notes.md
           fi
           gh release upload "$TAG" dist/* --clobber
-          gh release edit "$TAG" --draft=false --latest
+          case "$TAG" in
+            *-*) gh release edit "$TAG" --draft=false --prerelease --latest=false ;;
+            *)   gh release edit "$TAG" --draft=false --latest ;;
+          esac

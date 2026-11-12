@@ -763,7 +763,7 @@ function openEditConnection(c) {
     env ? h('div', { class: 'hint' }, 'This connection comes from an environment variable: only its tags can change here. You can also set them with ', h('code', {}, `DATABASE_TAGS_${c.id.replace(/^env-/, '').toUpperCase()}`), '.') : null,
     h('label', { class: 'check' }, ro, 'Read-only (block data changes)'),
     isRedisConn ? h('label', {}, 'Keys per scan', scanLimit,
-      h('span', { class: 'hint' }, 'The key list and the key search walk this many keys at a time; "Next" continues. Default: 10000.')) : null,
+      h('span', { class: 'hint' }, 'The key list and a "*" search walk this many keys at a time; "Next" continues. A search without "*" scans all keys. Default: 10000.')) : null,
     status);
   const save = h('button', {
     class: 'btn primary', onclick: async () => {
@@ -2045,7 +2045,24 @@ function jsonPane(raw, { readOnly, onSubmit, onCancel }) {
     if (jsonError(t)) return t;
     return compact ? reformatJson(t, 0) : t;
   };
-  return { dom: h('div', { class: 'json-pane' }, bar, h('div', { class: 'json-editor' }, view.dom)), view, value };
+  // Fold state as line numbers, so a new editor for the same text can fold the same blocks.
+  const folds = () => {
+    const lines = [];
+    CM.foldedRanges(view.state).between(0, view.state.doc.length, (from) => { lines.push(view.state.doc.lineAt(from).number); });
+    return lines;
+  };
+  const restoreFolds = (lines) => {
+    const { state } = view;
+    const effects = [];
+    for (const n of lines) {
+      if (n > state.doc.lines) continue;
+      const line = state.doc.line(n);
+      const range = CM.foldable(state, line.from, line.to);
+      if (range) effects.push(CM.foldEffect.of(range));
+    }
+    if (effects.length) view.dispatch({ effects });
+  };
+  return { dom: h('div', { class: 'json-pane' }, bar, h('div', { class: 'json-editor' }, view.dom)), view, value, folds, restoreFolds };
 }
 
 function editorText(v, c) {

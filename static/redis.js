@@ -71,13 +71,16 @@ export function createRedisUI(ctx) {
   // Keys per request: small requests keep each round trip short on a large keyspace.
   const SCAN_STEP = 1000;
   const filtering = (r) => !!(r.pattern.trim() || r.type);
+  // Plain search text (no "*") scans the whole keyspace in one pass: the user looks for one key.
+  const fullSearch = (r) => { const t = r.pattern.trim(); return !!t && !t.includes('*'); };
   const byKey = (a, b) => (a.exact !== b.exact ? (a.exact ? -1 : 1) : a.key < b.key ? -1 : a.key > b.key ? 1 : 0);
 
   /**
    * Loads keys with SCAN. `reset` starts over (a new filter or database) and always runs, even
    * while another scan is in flight: the generation number makes the older response stale.
    * "Next" (`reset = false`) is ignored while a scan runs.
-   * One pass walks scanLimit() keys of the keyspace (with or without a filter), then stops.
+   * One pass walks scanLimit() keys of the keyspace, then stops. A plain search text (no "*")
+   * walks the whole keyspace in one pass (still in small requests).
    * Only the key list and the counter are redrawn, so the filter input keeps focus.
    */
   async function scan(reset = false) {
@@ -97,7 +100,7 @@ export function createRedisUI(ctx) {
     r.loading = true;
     updateKeys();
     const text = r.pattern.trim();
-    const limit = scanLimit();
+    const limit = fullSearch(r) ? Infinity : scanLimit();
     let walked = 0;
     try {
       do {
@@ -226,8 +229,8 @@ export function createRedisUI(ctx) {
     if (!r.done) {
       list.append(h('div', { class: 'r-next' },
         h('span', { class: 'muted small' }, scannedText(r)),
-        h('button', { class: 'btn ghost sm r-more', disabled: r.loading, title: 'Scan the next part of the keyspace', onclick: () => scan(false) },
-          r.loading ? h('span', { class: 'spinner' }) : null, r.loading ? 'Scanning…' : `Next ${fmtNum(scanLimit())}`)));
+        r.loading && fullSearch(r) ? null : h('button', { class: 'btn ghost sm r-more', disabled: r.loading, title: 'Scan the next part of the keyspace', onclick: () => scan(false) },
+          r.loading ? h('span', { class: 'spinner' }) : null, r.loading ? 'Scanning…' : fullSearch(r) ? 'Continue the search' : `Next ${fmtNum(scanLimit())}`)));
     }
   }
 
@@ -501,9 +504,18 @@ export function createRedisUI(ctx) {
       onSubmit: ro ? null : () => submit(),
       onCancel: null,
     });
+    // Saving reloads the key and builds a new editor: keep the folded blocks and the scroll position.
+    // load() also redraws the old value while the request runs, so the state lives until the new value is drawn.
+    const kept = tab.jsonKeep;
+    if (!tab.loading) tab.jsonKeep = null;
+    if (kept) {
+      pane.restoreFolds(kept.folds);
+      requestAnimationFrame(() => { pane.view.scrollDOM.scrollTop = kept.scroll; });
+    }
     const submit = () => {
       const v = pane.value();
-      edit(tab, op, { value: v });
+      tab.jsonKeep = { folds: pane.folds(), scroll: pane.view.scrollDOM.scrollTop };
+      edit(tab, op, { value: v }).catch(() => { tab.jsonKeep = null; });
     };
     return h('div', { class: 'r-body' },
       h('div', { class: 'r-json' }, pane.dom),

@@ -9,7 +9,7 @@ export {
   copyLineDown, copyLineUp, moveLineDown, moveLineUp, cursorMatchingBracket, insertNewlineAndIndent, addCursorAbove, addCursorBelow, selectAll,
 } from '@codemirror/commands';
 export {
-  syntaxHighlighting, HighlightStyle, indentOnInput, bracketMatching, foldGutter, foldKeymap, indentUnit, foldAll, unfoldAll, foldable, foldEffect,
+  syntaxHighlighting, HighlightStyle, indentOnInput, bracketMatching, foldGutter, foldKeymap, indentUnit, foldAll, unfoldAll, foldable, foldEffect, foldedRanges,
 } from '@codemirror/language';
 export {
   autocompletion, completionKeymap, closeBrackets, closeBracketsKeymap, startCompletion, acceptCompletion,

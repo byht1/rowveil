@@ -1,0 +1,258 @@
+#![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
+#![recursion_limit = "256"]
+
+mod backend;
+mod cell_editor;
+mod conn_form;
+mod ddlsql;
+mod forms;
+mod connurl;
+mod grid;
+mod home;
+mod icons;
+mod kit;
+mod model;
+mod prefs;
+mod redis;
+mod schema_view;
+mod sql_complete;
+mod sql_view;
+mod sqlhl;
+mod sqltext;
+mod table_view;
+mod ui;
+mod update_ui;
+mod updater;
+mod workspace;
+
+use gpui_kit::component::{Theme, ThemeMode};
+use gpui_kit::*;
+use std::sync::Arc;
+
+/// The root view: the start page or one open connection.
+pub struct RowveilApp {
+    pub backend: Arc<backend::Backend>,
+    pub prefs: prefs::Prefs,
+    screen: Screen,
+    force_close: bool,
+    /// A newer alpha found by the check on start.
+    pub update_available: Option<String>,
+}
+
+enum Screen {
+    Home(Entity<home::Home>),
+    Workspace(Entity<workspace::Workspace>),
+}
+
+impl RowveilApp {
+    fn new(backend: Arc<backend::Backend>, window: &mut Window, cx: &mut Context<Self>) -> Self {
+        let prefs = prefs::Prefs::load();
+        apply_theme(&prefs.theme, window, cx);
+        let home = Self::home_view(&backend, prefs.tag_filter.clone(), window, cx);
+        let start = dev_env("ROWVEIL_NEXT_OPEN").or_else(|| prefs.last_conn.clone().filter(|_| prefs.open_last));
+        let mut this = Self { backend, prefs, screen: Screen::Home(home), force_close: false, update_available: None };
+        update_ui::check_on_start(cx);
+        if let Some(id) = start {
+            this.open_connection(id, window, cx);
+        }
+        // Warn before closing with unsaved table changes.
+        let me = cx.weak_entity();
+        window.on_window_should_close(cx, move |window, cx| {
+            let Some(app) = me.upgrade() else { return true };
+            let unsaved = match &app.read(cx).screen {
+                Screen::Workspace(w) => w.read(cx).has_unsaved(cx),
+                _ => false,
+            };
+            if !unsaved || app.read(cx).force_close {
+                return true;
+            }
+            let me = me.clone();
+            use gpui_kit::component::WindowExt as _;
+            window.open_alert_dialog(cx, move |a, _, _| {
+                let me = me.clone();
+                a.title("Close Rowveil?").description("Some tables have changes that are not saved.").show_cancel(true).ok_text("Close without saving").on_ok(move |_, window, cx| {
+                    let _ = me.update(cx, |a, _| a.force_close = true);
+                    window.remove_window();
+                    true
+                })
+            });
+            false
+        });
+        // Follow the system theme while "system" is chosen.
+        cx.observe_window_appearance(window, |this, window, cx| {
+            if this.prefs.theme == "system" {
+                apply_theme("system", window, cx);
+            }
+        })
+        .detach();
+        this
+    }
+
+    fn home_view(backend: &Arc<backend::Backend>, tags: Vec<String>, window: &mut Window, cx: &mut Context<Self>) -> Entity<home::Home> {
+        let app = cx.weak_entity();
+        let backend = backend.clone();
+        cx.new(|cx| home::Home::new(backend, app, tags, window, cx))
+    }
+
+    pub fn open_connection(&mut self, id: String, window: &mut Window, cx: &mut Context<Self>) {
+        let app = cx.weak_entity();
+        let backend = self.backend.clone();
+        self.prefs.last_conn = Some(id.clone());
+        self.prefs.save();
+        let state = self.prefs.conn_state.get(&id).cloned();
+        let ws = cx.new(|cx| workspace::Workspace::new(backend, id, state, app, window, cx));
+        self.screen = Screen::Workspace(ws);
+        cx.notify();
+    }
+
+    pub fn go_home(&mut self, window: &mut Window, cx: &mut Context<Self>) {
+        self.screen = Screen::Home(Self::home_view(&self.backend, self.prefs.tag_filter.clone(), window, cx));
+        cx.notify();
+    }
+
+    pub fn set_theme(&mut self, theme: &str, window: &mut Window, cx: &mut Context<Self>) {
+        self.prefs.theme = theme.to_string();
+        self.prefs.save();
+        apply_theme(theme, window, cx);
+        cx.notify();
+    }
+
+    pub fn set_open_last(&mut self, on: bool) {
+        self.prefs.open_last = on;
+        self.prefs.save();
+    }
+
+    /// Saves per-connection UI state (open tabs and similar).
+    pub fn save_conn_state(&mut self, id: &str, state: serde_json::Value) {
+        self.prefs.conn_state.insert(id.to_string(), state);
+        self.prefs.save();
+    }
+
+    pub fn history(&self, id: &str) -> Vec<String> {
+        self.prefs.history.get(id).and_then(|v| serde_json::from_value(v.clone()).ok()).unwrap_or_default()
+    }
+
+    pub fn push_history(&mut self, id: &str, sql: &str) {
+        let mut h = self.history(id);
+        h.retain(|s| s != sql);
+        h.insert(0, sql.to_string());
+        h.truncate(200);
+        self.prefs.history.insert(id.to_string(), serde_json::json!(h));
+        self.prefs.save();
+    }
+}
+
+/// The color themes (the same as the stable app), generated by themes/gen_themes.py.
+pub const THEME_NAMES: &[&str] = &["Rowveil Light", "Rowveil Dark", "Graphite", "Paper", "One Dark Pro", "Dracula", "Nord", "GitHub Light"];
+
+fn load_themes(cx: &mut App) {
+    let _ = gpui_kit::component::ThemeRegistry::global_mut(cx).load_themes_from_str(include_str!("themes.json"));
+}
+
+/// Applies a theme by name; "system" (or empty) follows the OS: Rowveil Light / Rowveil Dark.
+pub fn apply_theme(theme: &str, window: &mut Window, cx: &mut App) {
+    let dark_os = matches!(window.appearance(), WindowAppearance::Dark | WindowAppearance::VibrantDark);
+    let name = match theme {
+        "light" => "Rowveil Light",
+        "dark" => "Rowveil Dark",
+        "" | "system" => if dark_os { "Rowveil Dark" } else { "Rowveil Light" },
+        other => other,
+    };
+    let cfg = gpui_kit::component::ThemeRegistry::global(cx).themes().get(name).cloned();
+    let mode = match &cfg {
+        Some(c) => c.mode,
+        None if dark_os => ThemeMode::Dark,
+        None => ThemeMode::Light,
+    };
+    if let Some(c) = cfg {
+        let t = Theme::global_mut(cx);
+        if mode.is_dark() {
+            t.dark_theme = c;
+        } else {
+            t.light_theme = c;
+        }
+    }
+    ui::set_palette(name, mode.is_dark(), cx);
+    Theme::change(mode, Some(window), cx);
+    window.refresh();
+}
+
+impl Render for RowveilApp {
+    fn render(&mut self, _: &mut Window, _: &mut Context<Self>) -> impl IntoElement {
+        let body: AnyElement = match &self.screen {
+            Screen::Home(v) => v.clone().into_any_element(),
+            Screen::Workspace(v) => v.clone().into_any_element(),
+        };
+        div().size_full().child(body)
+    }
+}
+
+/// The theme picker: System + the color themes.
+pub fn theme_button(id: &'static str, current: &str, app: WeakEntity<RowveilApp>, cx: &App) -> impl IntoElement {
+    use gpui_kit::component::menu::{DropdownMenu as _, PopupMenuItem};
+    use gpui_kit::component::Sizable as _;
+    let label = if current.is_empty() || current == "system" { "System".to_string() } else { current.to_string() };
+    let cur = current.to_string();
+    kit::btn_ghost(id, cx).h(px(24.)).px(px(6.)).small().icon(kit::ico("palette")).label(label).dropdown_menu(move |mut menu, _, _| {
+        for name in std::iter::once("system").chain(THEME_NAMES.iter().copied()) {
+            let app = app.clone();
+            let on = cur == name || (name == "system" && cur.is_empty());
+            let label = if name == "system" { "System (light / dark)".to_string() } else { name.to_string() };
+            menu = menu.item(PopupMenuItem::new(label).checked(on).on_click(move |_, window, cx| {
+                let _ = app.update(cx, |a, cx| a.set_theme(name, window, cx));
+            }));
+        }
+        menu
+    })
+}
+
+/// A testing hook: read only in debug builds.
+pub fn dev_env(name: &str) -> Option<String> {
+    if cfg!(debug_assertions) {
+        std::env::var(name).ok().filter(|v| !v.is_empty())
+    } else {
+        None
+    }
+}
+
+/// Assets: the stable UI's line icons ("rv/<name>.svg"), then the bundled component icons.
+struct AppAssets;
+
+impl AssetSource for AppAssets {
+    fn load(&self, path: &str) -> Result<Option<std::borrow::Cow<'static, [u8]>>> {
+        if path == "brand/symbol.svg" {
+            return Ok(Some(std::borrow::Cow::Borrowed(include_bytes!("../../static/brand/symbol.svg"))));
+        }
+        if let Some(name) = path.strip_prefix("rv/").and_then(|p| p.strip_suffix(".svg")) {
+            return Ok(icons::ICONS.iter().find(|(n, _)| *n == name).map(|(_, svg)| std::borrow::Cow::Borrowed(svg.as_bytes())));
+        }
+        gpui_kit::assets::Assets.load(path)
+    }
+
+    fn list(&self, path: &str) -> Result<Vec<SharedString>> {
+        gpui_kit::assets::Assets.list(path)
+    }
+}
+
+fn main() {
+    let started = std::time::Instant::now();
+    updater::cleanup();
+    let backend = backend::Backend::new();
+    gpui_kit::application().with_assets(AppAssets).run(move |cx| {
+        gpui_kit::init(cx);
+        load_themes(cx);
+        ui::set_palette("Rowveil Dark", true, cx);
+        workspace::bind_keys(cx);
+        let bounds = Bounds::centered(None, size(px(1280.), px(800.)), cx);
+        let options = WindowOptions {
+            window_bounds: Some(WindowBounds::Windowed(bounds)),
+            titlebar: Some(TitlebarOptions { title: Some("Rowveil Next (alpha)".into()), ..Default::default() }),
+            ..Default::default()
+        };
+        gpui_kit::open_window(options, cx, |window, cx| cx.new(|cx| RowveilApp::new(backend, window, cx))).expect("open window");
+        if std::env::var_os("ROWVEIL_STARTUP_TIME").is_some() {
+            eprintln!("window opened in {} ms", started.elapsed().as_millis());
+        }
+        cx.activate(true);
+    });
+}

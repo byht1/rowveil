@@ -1,0 +1,58 @@
+name: Release Next (alpha)
+
+# Rowveil Next: the GPUI desktop UI in next/. Push a tag next-v0.5.0-alpha.1 to build it and
+# publish a GitHub pre-release. Pre-releases are never "latest", and the stable app's updater
+# reads only the latest release, so stable installs never see these builds.
+on:
+  push:
+    tags: ['next-v*']
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  windows:
+    name: Windows (exe)
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: next
+      - run: cargo build --release
+        working-directory: next
+      - name: Collect files
+        shell: pwsh
+        run: |
+          New-Item -ItemType Directory dist | Out-Null
+          Copy-Item next/target/release/rowveil-next.exe dist/rowveil-next-windows-x86_64.exe
+      - uses: actions/upload-artifact@v4
+        with:
+          name: next-windows
+          path: dist/*
+
+  publish:
+    name: Publish pre-release
+    needs: [windows]
+    if: startsWith(github.ref, 'refs/tags/')
+    runs-on: ubuntu-latest
+    env:
+      GH_TOKEN: ${{ github.token }}
+      TAG: ${{ github.ref_name }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/download-artifact@v4
+        with:
+          path: dist
+          merge-multiple: true
+      - run: cd dist && sha256sum * > SHA256SUMS.txt && cat SHA256SUMS.txt
+      - name: Publish
+        run: |
+          if ! gh release view "$TAG" >/dev/null 2>&1; then
+            gh release create "$TAG" --draft --prerelease --latest=false \
+              --title "Rowveil Next ${TAG#next-v}" --notes-file next/release-notes.md
+          fi
+          gh release upload "$TAG" dist/* --clobber
+          gh release edit "$TAG" --draft=false --prerelease --latest=false

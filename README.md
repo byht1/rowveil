@@ -68,9 +68,9 @@ Builds are on the [Releases](https://github.com/byht1/rowveil/releases/latest) p
 | Windows | `rowveil.exe` | Portable: one file, no install |
 | macOS 11+ | `Rowveil-macOS-universal.dmg` | Drag Rowveil to Applications. First start: right-click → Open |
 | Debian / Ubuntu | `rowveil-linux-amd64.deb` | `sudo apt install ./rowveil-linux-amd64.deb` |
-| Other Linux | `rowveil-linux-x86_64.tar.gz` | Needs WebKitGTK 4.1 and GTK 3 (see `README.txt` in the archive) |
+| Other Linux | `rowveil-linux-x86_64.tar.gz` | Needs Vulkan, xkbcommon and fontconfig (see `README.txt` in the archive) |
 
-Where data is kept (`connections.json`: connections, passwords in URLs as plain text; `ui-prefs.json`: theme, tabs, history; `window.json`; `rowveil.log`; `webview/`):
+Where data is kept (`connections.json`: connections, passwords in URLs as plain text; `saved-queries.json`: saved queries; `desktop-prefs.json`: theme, tabs, history of the desktop app; `ui-prefs.json`: the same for the browser version):
 
 | System | Folder |
 |---|---|
@@ -96,21 +96,22 @@ The desktop app checks for new versions on start and every 6 hours. When a new v
 | Linux, tar.gz | `rowveil` and `rowveil-server` are replaced in place |
 | Linux `.deb`; `rowveil-server` / Docker | A notice and a link to the release only |
 
-Turn off automatic checks in the updates window (click the version number in the footer). Updates do not touch your data or connections.
+Click the version number in the footer to check by hand. Updates do not touch your data or connections.
 
 ## Desktop app
 
-- Its own window with the Rowveil icon, no console and no browser. Engine: WebView2 (Windows), WKWebView (macOS), WebKitGTK (Linux).
-- Open each connection in its own window. The main window remembers its size and position.
-- CSV / JSON export opens the system "Save as" dialog, then offers "Show in folder".
+- A native window drawn on the GPU with [GPUI](https://www.gpui.rs/): one process, no web view, starts in about 0.3 s.
+- 8 color themes (System follows the OS light / dark setting).
+- CSV / JSON export opens the system "Save as" dialog, then shows the file in its folder.
 - Pass a database as an argument: `rowveil C:\data\app.db` or `rowveil postgres://user:pass@host/db`.
-- The server inside the app listens on `127.0.0.1` on a random port and accepts requests only from its own windows (a secret token per launch).
+- The app calls the API in-process: it opens no network port.
 
 ### Build from source
 
 ```bash
-cargo build --release                       # Windows / macOS
-sudo apt install libwebkit2gtk-4.1-dev libgtk-3-dev && cargo build --release   # Linux
+cd desktop && cargo build --release         # the desktop app (desktop/target/release/rowveil)
+# Linux first: sudo apt install libxkbcommon-x11-dev libwayland-dev libx11-xcb-dev libfontconfig1-dev libvulkan-dev
+cargo build --release --no-default-features --bin rowveil-server   # the web server
 ```
 
 Packages: `packaging/windows/build-msi.ps1` (WiX 5), `packaging/macos/build-dmg.sh`, `packaging/linux/package.sh`. A `v*` tag runs `.github/workflows/release.yml`: it builds all three systems, tests the installers and publishes the release.
@@ -184,11 +185,11 @@ bigquery://project/dataset?credentials=C:\key.json&location=EU
 
 ```bash
 cargo test
-cargo run -- examples/testbed/testbed.db                                   # desktop
+cargo run --manifest-path desktop/Cargo.toml -- examples/testbed/testbed.db  # desktop
 cargo run --bin rowveil-server -- --url sqlite://examples/testbed/testbed.db  # browser
 ```
 
-Layout: `src/lib.rs` is the server and API, `src/main.rs` is `rowveil-server`, `src/bin/desktop.rs` is the desktop window (tao + wry), `src/kv.rs` is Redis, `src/bigquery.rs` is BigQuery, `src/update.rs` is the updater, `build.rs` adds the icon and `.exe` metadata. Without the desktop (Linux / Docker): `cargo build --no-default-features --bin rowveil-server`.
+Layout: `src/lib.rs` is the server and API, `src/main.rs` is `rowveil-server`, `desktop/` is the desktop app (GPUI, its own Cargo workspace; it uses the API router in-process), `src/bin/desktop.rs` is the earlier web-view window (no longer released), `src/kv.rs` is Redis, `src/bigquery.rs` is BigQuery, `src/update.rs` is the updater, `build.rs` adds the icon and `.exe` metadata. Without the desktop (Linux / Docker): `cargo build --no-default-features --bin rowveil-server`.
 
 `ROWVEIL_UPDATE_FEED` points the updater at another releases feed (for tests).
 

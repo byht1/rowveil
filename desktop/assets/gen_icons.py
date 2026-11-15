@@ -1,6 +1,6 @@
-"""Builds next/src/icons.rs from the stable UI's line icons (ICONS in static/app.js).
+"""Builds desktop/src/icons.rs from the stable UI's line icons (ICONS in static/app.js).
 
-Run from the repository root:  python next/assets/gen_icons.py
+Run from the repository root:  python desktop/assets/gen_icons.py
 """
 import re
 
@@ -25,5 +25,5 @@ for name, paths in icons:
            'stroke="#000" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">' + paths + '</svg>')
     out.append(f'    ({name!r}, r##"{svg}"##),'.replace("'", '"', 2))
 out.append('];')
-open('next/src/icons.rs', 'w', encoding='utf-8', newline='\n').write('\n'.join(out) + '\n')
+open('desktop/src/icons.rs', 'w', encoding='utf-8', newline='\n').write('\n'.join(out) + '\n')
 print('wrote', len(icons), 'icons')

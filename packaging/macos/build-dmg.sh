@@ -1,8 +1,8 @@
 #!/usr/bin/env bash
 # Builds Rowveil.app (universal: Apple Silicon + Intel) and a .dmg.
-# Run on macOS after:
-#   cargo build --release --target aarch64-apple-darwin
-#   cargo build --release --target x86_64-apple-darwin
+# Run on macOS after building, for both aarch64-apple-darwin and x86_64-apple-darwin:
+#   the server:      cargo build --release --no-default-features --bin rowveil-server --target <t>
+#   the desktop app: cargo build --release --target <t>   (in desktop/)
 set -euo pipefail
 root="$(cd "$(dirname "$0")/../.." && pwd)"
 version="$(sed -n 's/^version = "\(.*\)"/\1/p' "$root/Cargo.toml" | head -1)"
@@ -11,7 +11,7 @@ work="$(mktemp -d)"
 mkdir -p "$dist"
 
 lipo -create -output "$work/rowveil" \
-  "$root/target/aarch64-apple-darwin/release/rowveil" "$root/target/x86_64-apple-darwin/release/rowveil"
+  "$root/desktop/target/aarch64-apple-darwin/release/rowveil" "$root/desktop/target/x86_64-apple-darwin/release/rowveil"
 lipo -create -output "$dist/rowveil-server-macos-universal" \
   "$root/target/aarch64-apple-darwin/release/rowveil-server" "$root/target/x86_64-apple-darwin/release/rowveil-server"
 

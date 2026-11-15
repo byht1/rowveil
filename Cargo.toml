@@ -1,6 +1,6 @@
 [package]
 name = "rowveil"
-version = "0.4.7"
+version = "0.5.0"
 edition = "2021"
 description = "Rowveil: database explorer and query tool for PostgreSQL, MySQL, SQLite, Redis and BigQuery"
 license = "MIT"
@@ -14,7 +14,8 @@ keywords = ["database", "sql", "postgresql", "redis", "bigquery"]
 name = "rowveil"
 path = "src/lib.rs"
 
-# Desktop app: its own window (WebView2 on Windows), no console, no browser.
+# The earlier desktop app (a web view: WebView2, WKWebView, WebKitGTK). Releases ship the GPUI app
+# from desktop/ instead; this one is kept for development only.
 [[bin]]
 name = "rowveil"
 path = "src/bin/desktop.rs"

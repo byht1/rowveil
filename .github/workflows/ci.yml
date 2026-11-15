@@ -19,17 +19,31 @@ jobs:
       - run: cargo test --no-default-features
 
   desktop:
-    name: Desktop (Windows)
-    runs-on: windows-latest
+    # The GPUI desktop app (desktop/, its own workspace and Cargo.lock).
+    name: Desktop (${{ matrix.os }})
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [windows-latest, macos-15, ubuntu-22.04]
+    runs-on: ${{ matrix.os }}
     steps:
       - uses: actions/checkout@v4
+      - name: Install GPUI libraries (Linux)
+        if: runner.os == 'Linux'
+        run: sudo apt-get update && sudo apt-get install -y libxkbcommon-dev libxkbcommon-x11-dev libwayland-dev libx11-xcb-dev libxcb1-dev libfontconfig1-dev libfreetype6-dev libvulkan-dev
       - uses: dtolnay/rust-toolchain@stable
       - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: desktop
       - run: cargo build --release
+        working-directory: desktop
       - run: cargo test
+        working-directory: desktop
+      - run: ./target/release/rowveil --version
+        if: runner.os != 'Windows'
+        working-directory: desktop
       - uses: actions/upload-artifact@v4
+        if: runner.os == 'Windows'
         with:
           name: rowveil-windows
-          path: |
-            target/release/rowveil.exe
-            target/release/rowveil-server.exe
+          path: desktop/target/release/rowveil.exe

@@ -24,18 +24,21 @@ fn runtime() -> &'static tokio::runtime::Runtime {
     })
 }
 
-/// Runs any future on the tokio runtime (reqwest needs it); await the result from the UI.
-pub async fn run<F, T>(f: F) -> Result<T>
-where
-    F: std::future::Future<Output = Result<T>> + Send + 'static,
-    T: Send + 'static,
-{
-    runtime().spawn(f).await.map_err(|e| anyhow!("Task failed: {e}"))?
-}
-
 pub struct Backend {
     router: Router,
     pub data_dir: PathBuf,
+    cookie: String,
+}
+
+/// A per-launch secret (the router's desktop mode needs one; nothing outside this process sees it).
+fn token() -> String {
+    use std::hash::{BuildHasher, Hasher};
+    let mut h = std::collections::hash_map::RandomState::new().build_hasher();
+    h.write_u128(std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH).map(|d| d.as_nanos()).unwrap_or(0));
+    h.write_u32(std::process::id());
+    let a = h.finish();
+    let b = std::collections::hash_map::RandomState::new().build_hasher().finish();
+    format!("{a:016x}{b:016x}")
 }
 
 /// The data directory: STUDIO_DATA_DIR, or the stable app's folder (shared connections).
@@ -44,19 +47,24 @@ pub fn data_dir() -> PathBuf {
 }
 
 impl Backend {
-    pub fn new() -> Arc<Self> {
+    /// `url`: a database URL or SQLite file from the command line (the "env-default" connection).
+    pub fn new(url: Option<String>, read_only: bool) -> Arc<Self> {
         let data_dir = data_dir();
-        let opts = rowveil::Options { url: None, data_dir: data_dir.clone(), read_only: false, basic_auth: None, app_token: None };
+        // Desktop mode: the router enables the updater and desktop-only endpoints; every call
+        // carries the token as the cookie the guard expects.
+        let token = token();
+        let opts = rowveil::Options { url, data_dir: data_dir.clone(), read_only, basic_auth: None, app_token: Some(token.clone()) };
         // The router builds its state on the runtime (it may spawn tasks).
         let (router, _) = runtime().block_on(async { rowveil::router(&opts) });
-        Arc::new(Self { router, data_dir })
+        Arc::new(Self { router, data_dir, cookie: format!("rv_token={token}") })
     }
 
     /// Calls an API endpoint ("/api" is added). Errors carry the server's message.
     pub async fn call(self: Arc<Self>, method: Method, path: String, body: Option<Value>) -> Result<Value> {
         let router = self.router.clone();
+        let cookie = self.cookie.clone();
         let fut = async move {
-            let mut req = Request::builder().method(method).uri(format!("/api{path}"));
+            let mut req = Request::builder().method(method).uri(format!("/api{path}")).header("cookie", cookie);
             let body = match body {
                 Some(v) => {
                     req = req.header("content-type", "application/json");

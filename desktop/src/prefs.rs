@@ -1,5 +1,5 @@
-//! UI settings of Rowveil Next, in next-prefs.json next to connections.json.
-//! A separate file: the alpha never changes the stable app's ui-prefs.json.
+//! UI settings of the desktop app, in desktop-prefs.json next to connections.json
+//! (the web UI keeps its own ui-prefs.json). The alpha's next-prefs.json is read once.
 
 use serde::{Deserialize, Serialize};
 use serde_json::{Map, Value};
@@ -26,12 +26,13 @@ pub struct Prefs {
 }
 
 fn path() -> PathBuf {
-    crate::backend::data_dir().join("next-prefs.json")
+    crate::backend::data_dir().join("desktop-prefs.json")
 }
 
 impl Prefs {
     pub fn load() -> Self {
-        std::fs::read(path()).ok().and_then(|b| serde_json::from_slice(&b).ok()).unwrap_or_else(|| Prefs { theme: "system".into(), ..Default::default() })
+        let old = crate::backend::data_dir().join("next-prefs.json");
+        std::fs::read(path()).or_else(|_| std::fs::read(&old)).ok().and_then(|b| serde_json::from_slice(&b).ok()).unwrap_or_else(|| Prefs { theme: "system".into(), ..Default::default() })
     }
 
     pub fn save(&self) {

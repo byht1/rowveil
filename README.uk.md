@@ -68,9 +68,9 @@ Database explorer & query tool. Окремий десктопний застос
 | Windows | `rowveil.exe` | Portable: один файл без встановлення |
 | macOS 11+ | `Rowveil-macOS-universal.dmg` | Перетягніть Rowveil у Applications. Перший запуск: правий клік → Open |
 | Debian / Ubuntu | `rowveil-linux-amd64.deb` | `sudo apt install ./rowveil-linux-amd64.deb` |
-| Інший Linux | `rowveil-linux-x86_64.tar.gz` | Потрібні WebKitGTK 4.1 і GTK 3 (див. `README.txt` в архіві) |
+| Інший Linux | `rowveil-linux-x86_64.tar.gz` | Потрібні Vulkan, xkbcommon і fontconfig (див. `README.txt` в архіві) |
 
-Де зберігаються дані (`connections.json` — підключення, паролі в URL відкритим текстом; `ui-prefs.json` — тема, вкладки, історія; `window.json`; `rowveil.log`; `webview/`):
+Де зберігаються дані (`connections.json` — підключення, паролі в URL відкритим текстом; `saved-queries.json` — збережені запити; `desktop-prefs.json` — тема, вкладки, історія десктопного застосунку; `ui-prefs.json` — те саме для версії в браузері):
 
 | Система | Папка |
 |---|---|
@@ -96,21 +96,22 @@ Database explorer & query tool. Окремий десктопний застос
 | Linux, tar.gz | Файли `rowveil` і `rowveil-server` замінюються на місці |
 | Linux, `.deb`; `rowveil-server` / Docker | Лише сповіщення і посилання на реліз |
 
-Автоматичну перевірку можна вимкнути у вікні оновлень (клік по номеру версії у футері). Дані й підключення під час оновлення не змінюються.
+Перевірити вручну: клік по номеру версії у футері. Дані й підключення під час оновлення не змінюються.
 
 ## Десктопний застосунок
 
-- Власне вікно з іконкою Rowveil, без консолі й браузера. Рушій: WebView2 (Windows), WKWebView (macOS), WebKitGTK (Linux).
-- Кожне підключення можна відкрити в окремому вікні. Розмір і позиція головного вікна запам'ятовуються.
-- Експорт CSV / JSON відкриває системний діалог «Зберегти як»; після збереження — «Show in folder».
+- Нативне вікно, яке малює GPU через [GPUI](https://www.gpui.rs/): один процес, без веб-рушія, запуск приблизно за 0,3 с.
+- 8 колірних тем (System іде за світлою / темною темою ОС).
+- Експорт CSV / JSON відкриває системний діалог «Зберегти як», потім показує файл у папці.
 - Базу можна передати аргументом: `rowveil C:\data\app.db` або `rowveil postgres://user:pass@host/db`.
-- Сервер усередині застосунку слухає лише `127.0.0.1` на випадковому порту й приймає запити тільки від свого вікна (секретний токен на кожен запуск).
+- Застосунок викликає API всередині процесу: мережевий порт не відкривається.
 
 ### Збірка з вихідного коду
 
 ```bash
-cargo build --release                       # Windows / macOS
-sudo apt install libwebkit2gtk-4.1-dev libgtk-3-dev && cargo build --release   # Linux
+cd desktop && cargo build --release         # десктоп (desktop/target/release/rowveil)
+# Спершу на Linux: sudo apt install libxkbcommon-x11-dev libwayland-dev libx11-xcb-dev libfontconfig1-dev libvulkan-dev
+cargo build --release --no-default-features --bin rowveil-server   # веб-сервер
 ```
 
 Пакети: `packaging/windows/build-msi.ps1` (WiX 5), `packaging/macos/build-dmg.sh`, `packaging/linux/package.sh`. Тег `v*` запускає `.github/workflows/release.yml`: збірка для всіх трьох систем, перевірка інсталяторів і публікація релізу.
@@ -183,11 +184,11 @@ bigquery://project/dataset?credentials=C:\key.json&location=EU
 
 ```bash
 cargo test
-cargo run -- examples/testbed/testbed.db                                   # десктоп
+cargo run --manifest-path desktop/Cargo.toml -- examples/testbed/testbed.db  # десктоп
 cargo run --bin rowveil-server -- --url sqlite://examples/testbed/testbed.db  # браузер
 ```
 
-Структура: `src/lib.rs` — сервер і API, `src/main.rs` — `rowveil-server`, `src/bin/desktop.rs` — десктопне вікно (tao + wry), `build.rs` — іконка й метадані `.exe`. Без десктопу (Linux / Docker): `cargo build --no-default-features --bin rowveil-server`.
+Структура: `src/lib.rs` — сервер і API, `src/main.rs` — `rowveil-server`, `desktop/` — десктопний застосунок (GPUI, окремий Cargo workspace; викликає API-роутер усередині процесу), `src/bin/desktop.rs` — попереднє вікно з веб-рушієм (більше не випускається), `build.rs` — іконка й метадані `.exe`. Без десктопу (Linux / Docker): `cargo build --no-default-features --bin rowveil-server`.
 
 Бренд: `assets/brand/` (кольори, гайд), `assets/rowveil.ico`, `static/brand/`.
 

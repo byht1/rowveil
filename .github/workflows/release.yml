@@ -20,7 +20,14 @@ jobs:
       - uses: actions/checkout@v4
       - uses: dtolnay/rust-toolchain@stable
       - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: |
+            .
+            desktop
+      # The server (web UI) from the root crate; the desktop app (GPUI) from desktop/.
+      - run: cargo build --release --no-default-features --bin rowveil-server
       - run: cargo build --release
+        working-directory: desktop
       - name: Install WiX 5
         run: dotnet tool install --global wix --version 5.0.2
       - name: Build MSI
@@ -48,7 +55,7 @@ jobs:
         shell: pwsh
         run: |
           New-Item -ItemType Directory dist | Out-Null
-          Copy-Item target/release/rowveil.exe dist/rowveil.exe
+          Copy-Item desktop/target/release/rowveil.exe dist/rowveil.exe
           Copy-Item target/release/rowveil-server.exe dist/rowveil-server-windows-x86_64.exe
           Copy-Item (Get-ChildItem target/release/Rowveil-*-x64.msi | Select-Object -First 1).FullName dist/Rowveil-Setup-x64.msi
       - uses: actions/upload-artifact@v4
@@ -67,8 +74,16 @@ jobs:
         with:
           targets: aarch64-apple-darwin,x86_64-apple-darwin
       - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: |
+            .
+            desktop
+      - run: cargo build --release --no-default-features --bin rowveil-server --target aarch64-apple-darwin
+      - run: cargo build --release --no-default-features --bin rowveil-server --target x86_64-apple-darwin
       - run: cargo build --release --target aarch64-apple-darwin
+        working-directory: desktop
       - run: cargo build --release --target x86_64-apple-darwin
+        working-directory: desktop
       - run: bash packaging/macos/build-dmg.sh
       - name: Smoke-test the app bundle
         run: |
@@ -88,11 +103,17 @@ jobs:
     runs-on: ubuntu-22.04
     steps:
       - uses: actions/checkout@v4
-      - name: Install WebKitGTK
-        run: sudo apt-get update && sudo apt-get install -y libwebkit2gtk-4.1-dev libgtk-3-dev
+      - name: Install GPUI libraries
+        run: sudo apt-get update && sudo apt-get install -y libxkbcommon-dev libxkbcommon-x11-dev libwayland-dev libx11-xcb-dev libxcb1-dev libfontconfig1-dev libfreetype6-dev libvulkan-dev
       - uses: dtolnay/rust-toolchain@stable
       - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: |
+            .
+            desktop
+      - run: cargo build --release --no-default-features --bin rowveil-server
       - run: cargo build --release
+        working-directory: desktop
       - run: bash packaging/linux/package.sh
       - name: Smoke-test the package
         run: |

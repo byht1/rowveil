@@ -1,6 +1,6 @@
-"""Builds next/src/themes.json (gpui-component themes) from the stable UI's CSS themes.
+"""Builds desktop/src/themes.json (gpui-component themes) from the stable UI's CSS themes.
 
-Run from the repository root:  python next/themes/gen_themes.py
+Run from the repository root:  python desktop/themes/gen_themes.py
 """
 import json
 import re
@@ -100,8 +100,8 @@ pal = {}
 for i, n in THEMES:
     v = {k: color(x) for k, x in block(i).items()}
     pal[n] = {k.replace('-', '_'): v.get(k, v['text']) for k in PAL_KEYS}
-open('next/src/palette.json', 'w', encoding='utf-8', newline=chr(10)).write(json.dumps(pal, indent=1) + chr(10))
+open('desktop/src/palette.json', 'w', encoding='utf-8', newline=chr(10)).write(json.dumps(pal, indent=1) + chr(10))
 
 out = {'name': 'Rowveil', 'author': 'Rowveil', 'themes': [config(i, n) for i, n in THEMES]}
-open('next/src/themes.json', 'w', encoding='utf-8', newline='\n').write(json.dumps(out, indent=2) + '\n')
+open('desktop/src/themes.json', 'w', encoding='utf-8', newline='\n').write(json.dumps(out, indent=2) + '\n')
 print('wrote', len(out['themes']), 'themes')

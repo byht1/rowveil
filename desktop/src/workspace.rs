@@ -1065,7 +1065,7 @@ impl Render for Workspace {
     fn render(&mut self, window: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
         let theme = cx.theme().clone();
         let prod = self.conn.tags.iter().any(|t| t.contains("PROD"));
-        window.set_window_title(&format!("{}{} — Rowveil Next", if prod { "[PROD] " } else { "" }, self.conn.name));
+        window.set_window_title(&format!("{}{} — Rowveil", if prod { "[PROD] " } else { "" }, self.conn.name));
         if self.conn.dialect() == "redis" || self.schema.as_ref().is_some_and(|s| s.dialect == "redis") {
             let (side, main): (AnyElement, AnyElement) = match (&self.redis, &self.error) {
                 (Some(r), _) => (r.update(cx, |p, cx| p.render_sidebar(cx).into_any_element()), r.clone().into_any_element()),

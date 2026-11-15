@@ -1,12 +1,12 @@
-# Rowveil Next: migration checklist
+# Rowveil desktop (GPUI): parity checklist
 
 The feature inventory of the stable web UI (static/app.js, static/redis.js). Every item must work
-in Rowveil Next before it replaces the stable app. `{c}` = `/connections/{id}`; all paths have the
+in the GPUI desktop app (desktop/), which replaces the web-view desktop app in 0.5.0. `{c}` = `/connections/{id}`; all paths have the
 `/api` prefix (Next calls the same router in-process). Tick an item when it works in Next. `[x]` works, `[~]` partly (see the note), `[ ]` not yet.
 
 ## Global / infra
 - [x] Boot: connections list; open the last connection when "open last" is on
-- [x] Prefs (Next: next-prefs.json): theme, openLast, last connection, tabs per connection, history
+- [x] Prefs (desktop-prefs.json): theme, openLast, last connection, tabs per connection, history
 - [x] Downloads: native "Save as" dialog, toast with "Show in folder"
 - [x] PROD tag: red accent and `[PROD]` window title prefix
 - [x] Sidebar resizer 180–480 px (default 248), saved
@@ -127,7 +127,7 @@ in Rowveil Next before it replaces the stable app. `{c}` = `/connections/{id}`; 
 - [x] Themes: light/dark following the system by default; more color themes later
 
 ## Updates
-- [x] Next has its own update channel (pre-releases `next-v*`); check, download, restart
+- [x] Updates through the router's updater (`/api/update/*`): check on start and every 6 hours, download, SHA-256, restart (MSI, portable exe, app bundle, tarball)
 
 ## Keyboard
 - [x] Ctrl+S (table changes / SQL save); SQL: Ctrl+Enter, Shift+Ctrl+Enter, Shift+Alt+F, Ctrl+S, Tab; grid keys; dialogs Esc / Enter; Redis console keys

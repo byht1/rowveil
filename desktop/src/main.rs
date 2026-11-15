@@ -22,7 +22,6 @@ mod sqltext;
 mod table_view;
 mod ui;
 mod update_ui;
-mod updater;
 mod workspace;
 
 use gpui_kit::component::{Theme, ThemeMode};
@@ -49,9 +48,10 @@ impl RowveilApp {
         let prefs = prefs::Prefs::load();
         apply_theme(&prefs.theme, window, cx);
         let home = Self::home_view(&backend, prefs.tag_filter.clone(), window, cx);
-        let start = dev_env("ROWVEIL_NEXT_OPEN").or_else(|| prefs.last_conn.clone().filter(|_| prefs.open_last));
+        let from_cli = START_URL.get().copied().unwrap_or(false).then(|| "env-default".to_string());
+        let start = dev_env("ROWVEIL_NEXT_OPEN").or(from_cli).or_else(|| prefs.last_conn.clone().filter(|_| prefs.open_last));
         let mut this = Self { backend, prefs, screen: Screen::Home(home), force_close: false, update_available: None };
-        update_ui::check_on_start(cx);
+        update_ui::check_on_start(this.backend.clone(), cx);
         if let Some(id) = start {
             this.open_connection(id, window, cx);
         }
@@ -234,10 +234,45 @@ impl AssetSource for AppAssets {
     }
 }
 
+/// The command line (the same as the earlier desktop app).
+#[derive(clap::Parser, Debug)]
+#[command(name = "rowveil", version = env!("CARGO_PKG_VERSION"), about = "Rowveil: database explorer and query tool")]
+struct Cli {
+    /// Database URL or path to a SQLite file to open on start.
+    #[arg(env = "DATABASE_URL")]
+    url: Option<String>,
+    /// Directory for saved connections and settings.
+    #[arg(long, env = "STUDIO_DATA_DIR")]
+    data_dir: Option<std::path::PathBuf>,
+    /// Block all data changes.
+    #[arg(long, env = "STUDIO_READ_ONLY")]
+    read_only: bool,
+}
+
+/// A file path given on the command line ("Open with Rowveil") becomes a SQLite URL.
+fn to_url(arg: String) -> String {
+    let p = std::path::Path::new(&arg);
+    if !arg.contains("://") && p.is_file() {
+        let abs = std::fs::canonicalize(p).unwrap_or_else(|_| p.to_path_buf());
+        let s = abs.display().to_string();
+        let s = s.strip_prefix(r"\\?\").unwrap_or(&s).replace('\\', "/");
+        return format!("sqlite://{s}");
+    }
+    arg
+}
+
+/// The connection to open first: a URL from the command line wins over "open last".
+static START_URL: std::sync::OnceLock<bool> = std::sync::OnceLock::new();
+
 fn main() {
     let started = std::time::Instant::now();
-    updater::cleanup();
-    let backend = backend::Backend::new();
+    let cli = <Cli as clap::Parser>::parse();
+    if let Some(d) = &cli.data_dir {
+        std::env::set_var("STUDIO_DATA_DIR", d);
+    }
+    let url = cli.url.clone().filter(|u| !u.trim().is_empty()).map(to_url);
+    let _ = START_URL.set(url.is_some());
+    let backend = backend::Backend::new(url, cli.read_only);
     gpui_kit::application().with_assets(AppAssets).run(move |cx| {
         gpui_kit::init(cx);
         load_themes(cx);
@@ -246,7 +281,8 @@ fn main() {
         let bounds = Bounds::centered(None, size(px(1280.), px(800.)), cx);
         let options = WindowOptions {
             window_bounds: Some(WindowBounds::Windowed(bounds)),
-            titlebar: Some(TitlebarOptions { title: Some("Rowveil Next (alpha)".into()), ..Default::default() }),
+            titlebar: Some(TitlebarOptions { title: Some("Rowveil".into()), ..Default::default() }),
+            app_id: Some("rowveil".into()),
             ..Default::default()
         };
         gpui_kit::open_window(options, cx, |window, cx| cx.new(|cx| RowveilApp::new(backend, window, cx))).expect("open window");

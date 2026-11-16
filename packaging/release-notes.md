@@ -1,4 +1,4 @@
-Rowveil 0.5.0 has a **new desktop app**. It is drawn on the GPU with [GPUI](https://www.gpui.rs/) instead of a web view: it starts faster and uses much less memory. The features and the look stay the same.
+Rowveil 0.5.1 fixes **Tab in the SQL autocomplete**. It also has everything from 0.5.0, the **new desktop app**.
 
 ## Downloads
 
@@ -12,14 +12,20 @@ Rowveil 0.5.0 has a **new desktop app**. It is drawn on the GPU with [GPUI](http
 | Server | `rowveil-server-*` | The web UI for a browser or a server (Windows, macOS, Linux). |
 | | `SHA256SUMS.txt` | Checksums. |
 
-## What's new
+## What's new in 0.5.1
+
+- **SQL autocomplete: Tab accepts the suggestion again.** In 0.5.0, Tab inserted an indent and closed the list. Now Tab inserts the selected suggestion, as Enter does. Without the list, Tab indents as before.
+
+## New in 0.5.0
+
+The desktop app is drawn on the GPU with [GPUI](https://www.gpui.rs/) instead of a web view: it starts faster and uses much less memory. The features and the look stay the same.
 
 - **A native desktop app.** One process instead of a web view with its helper processes. On Windows: the window is ready in about 0.3 s (0.4.7: about 0.5 s), and the app uses about 100 MB of memory (0.4.7: about 430 MB).
 - **The same features**: tables with filters, sorting, editing and export; the SQL console; the Schema tab; Redis; BigQuery; saved queries; the 8 themes.
 - **No WebView2 / WebKitGTK.** On Linux the app needs Vulkan instead (see the table above).
-- **Updates.** Rowveil 0.4.x offers this version through the **Update** button in the sidebar footer.
+- **Updates.** Rowveil 0.4.x and 0.5.0 offer this version through the **Update** button in the sidebar footer.
 
-## Before you update
+## Before you update from 0.4.x
 
 - Your connections and saved queries stay. The desktop app starts with the default theme and no open tabs: its settings are now in `desktop-prefs.json`.
 - The cell editor opens as a dialog in the middle of the window (0.4.x: next to the cell).

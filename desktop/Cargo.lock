@@ -5770,7 +5770,7 @@ dependencies = [
 
 [[package]]
 name = "rowveil"
-version = "0.5.0"
+version = "0.5.1"
 dependencies = [
  "anyhow",
  "axum",
@@ -5796,7 +5796,7 @@ dependencies = [
 
 [[package]]
 name = "rowveil-desktop"
-version = "0.5.0"
+version = "0.5.1"
 dependencies = [
  "anyhow",
  "axum",

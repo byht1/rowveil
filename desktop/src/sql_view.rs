@@ -17,7 +17,7 @@ use gpui_kit::*;
 use serde_json::{json, Value};
 use std::sync::Arc;
 
-actions!(rowveil_sql, [Explain, Prettify]);
+actions!(rowveil_sql, [Explain, Prettify, TabKey]);
 
 pub struct SqlView {
     backend: Arc<Backend>,
@@ -174,6 +174,16 @@ impl SqlView {
             }));
             g
         });
+    }
+
+    /// Tab (bound in the editor of a SQL tab): accepts the selected suggestion while the
+    /// autocomplete menu is open, as Enter does; otherwise it indents as usual.
+    fn tab_key(&mut self, _: &TabKey, window: &mut Window, cx: &mut Context<Self>) {
+        if self.editor.read(cx).completion_menu_state().open {
+            window.dispatch_action(Box::new(gpui_kit::component::input::Enter { secondary: false, shift: false }), cx);
+        } else {
+            window.dispatch_action(Box::new(gpui_kit::component::input::IndentInline), cx);
+        }
     }
 
     fn view_cell(&mut self, row: usize, col: usize, window: &mut Window, cx: &mut Context<Self>) {
@@ -447,6 +457,7 @@ impl Render for SqlView {
             .key_context("SqlView")
             .track_focus(&self.focus)
             .on_action(cx.listener(Self::run_current))
+            .on_action(cx.listener(Self::tab_key))
             .on_action(cx.listener(Self::run_all))
             .on_action(cx.listener(Self::explain))
             .on_action(cx.listener(Self::prettify))

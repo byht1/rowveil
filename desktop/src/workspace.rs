@@ -21,8 +21,10 @@ use std::time::Duration;
 actions!(rowveil_next, [RunSql, RunAll, Save, Submit, NewSqlTab, CloseTab, EditCell, CopyCell]);
 
 pub fn bind_keys(cx: &mut App) {
-    use crate::sql_view::{Explain, Prettify};
+    use crate::sql_view::{Explain, Prettify, TabKey};
     cx.bind_keys([
+        // After the editor's own "tab" (indent): Tab accepts an autocomplete suggestion first.
+        KeyBinding::new("tab", TabKey, Some("SqlView > Input")),
         KeyBinding::new("ctrl-enter", RunSql, Some("SqlView")),
         KeyBinding::new("ctrl-shift-enter", RunAll, Some("SqlView")),
         KeyBinding::new("shift-alt-f", Prettify, Some("SqlView")),

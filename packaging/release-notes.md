@@ -1,4 +1,4 @@
-Rowveil 0.5.1 fixes **Tab in the SQL autocomplete**. It also has everything from 0.5.0, the **new desktop app**.
+Rowveil 0.5.1 fixes **Tab in the SQL autocomplete** and brings back the **Collapse / Expand buttons for JSON**. It also has everything from 0.5.0, the **new desktop app**.
 
 ## Downloads
 
@@ -15,6 +15,7 @@ Rowveil 0.5.1 fixes **Tab in the SQL autocomplete**. It also has everything from
 ## What's new in 0.5.1
 
 - **SQL autocomplete: Tab accepts the suggestion again.** In 0.5.0, Tab inserted an indent and closed the list. Now Tab inserts the selected suggestion, as Enter does. Without the list, Tab indents as before.
+- **JSON: Collapse and Expand are back.** 0.5.0 did not have them. In the cell dialog and for a Redis JSON value, Collapse folds every block inside the top-level value, so the top-level keys stay visible. Expand opens all blocks.
 
 ## New in 0.5.0
 

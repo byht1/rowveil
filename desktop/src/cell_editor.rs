@@ -36,6 +36,16 @@ pub fn pretty_json(text: &str) -> Option<String> {
     serde_json::to_string_pretty(&v).ok()
 }
 
+/// Collapse (as in 0.4.x): fold every block inside the top-level object or array, so its keys
+/// stay visible. A value without nested blocks folds the top level itself.
+pub fn collapse_json(s: &mut EditorState, window: &mut Window, cx: &mut Context<EditorState>) {
+    s.fold_at_level(2, cx);
+    if s.display_map().folded_ranges().is_empty() {
+        s.fold_all(cx);
+    }
+    s.focus(window, cx);
+}
+
 impl CellEditor {
     pub fn new(column: Column, value: Value, read_only: bool, allow_default: bool, on_apply: Option<OnApply>, window: &mut Window, cx: &mut Context<Self>) -> Self {
         let mut subs = Vec::new();
@@ -188,6 +198,19 @@ impl Render for CellEditor {
                                         cx.notify();
                                     });
                                 }, cx))
+                                .child(crate::kit::btn_ghost_sm("collapse", cx).label("Collapse").tooltip("Collapse all: keep the top-level keys visible").on_click({
+                                    let e = e.clone();
+                                    move |_, window, cx| e.update(cx, |s, cx| collapse_json(s, window, cx))
+                                }))
+                                .child(crate::kit::btn_ghost_sm("expand", cx).label("Expand").tooltip("Expand all").on_click({
+                                    let e = e.clone();
+                                    move |_, window, cx| {
+                                        e.update(cx, |s, cx| {
+                                            s.unfold_all(cx);
+                                            s.focus(window, cx);
+                                        })
+                                    }
+                                }))
                                 .child(div().flex_1())
                                 .child(div().text_size(px(11.5)).text_color(if valid == Some(true) { p.true_ } else { p.danger }).child(if valid == Some(true) { "Valid JSON" } else { "Invalid JSON" })),
                         )

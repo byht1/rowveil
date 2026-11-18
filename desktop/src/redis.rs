@@ -1420,9 +1420,27 @@ impl KeyView {
                 };
                 let e2 = e.clone();
                 let original = self.original.clone();
+                let foldable = !e.read(cx).fold_candidates().is_empty();
+                let (ec, ex) = (e.clone(), e.clone());
                 v_flex()
                     .size_full()
                     .when_some(note, |d, n| d.child(div().mx(px(12.)).mt(px(12.)).px(px(10.)).py(px(8.)).rounded(px(6.)).bg(p.mod_bg).text_size(px(12.)).text_color(p.muted).child(n)))
+                    .when(foldable, |d| {
+                        d.child(
+                            h_flex()
+                                .mx(px(12.))
+                                .mt(px(12.))
+                                .mb(px(-4.))
+                                .gap(px(6.))
+                                .child(kit::btn_ghost_sm("collapse", cx).label("Collapse").tooltip("Collapse all: keep the top-level keys visible").on_click(move |_, window, cx| ec.update(cx, |s, cx| crate::cell_editor::collapse_json(s, window, cx))))
+                                .child(kit::btn_ghost_sm("expand", cx).label("Expand").tooltip("Expand all").on_click(move |_, window, cx| {
+                                    ex.update(cx, |s, cx| {
+                                        s.unfold_all(cx);
+                                        s.focus(window, cx);
+                                    })
+                                })),
+                        )
+                    })
                     .child(
                         div()
                             .flex_1()

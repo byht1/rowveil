@@ -33,3 +33,8 @@ winresource = "0.1.34"
 opt-level = 3
 lto = "thin"
 strip = true
+
+# The JSON Collapse / Expand buttons need fold_at_level / unfold_all: byht1/gpui-kit branch fold-all
+# (v0.9.1 + the patch). Remove this when longbridge/gpui-kit#4028 is released.
+[patch.crates-io]
+gpui-base = { git = "https://github.com/byht1/gpui-kit", rev = "a3fded0bdcabb836219206bebe0d4fdba93335c2" }

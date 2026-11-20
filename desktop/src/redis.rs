@@ -9,7 +9,7 @@ use crate::{kit, ui};
 use crate::workspace::{Save, Workspace};
 use gpui_kit::component::button::{Button, ButtonVariants as _};
 use gpui_kit::component::input::{Editor, EditorState, Input, InputEvent, InputState};
-use gpui_kit::component::menu::{DropdownMenu as _, PopupMenuItem};
+use gpui_kit::component::menu::{ContextMenuExt as _, DropdownMenu as _, PopupMenuItem};
 use gpui_kit::component::table::{TableEvent, TableState};
 use gpui_kit::component::{h_flex, v_flex, ActiveTheme as _, Disableable as _, Sizable as _, StyledExt as _};
 use gpui_kit::prelude::FluentBuilder as _;
@@ -1726,12 +1726,11 @@ impl Render for ConsoleView {
     fn render(&mut self, _: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
         let p = ui::pal(cx);
         let mono = kit::cx_mono(cx);
-        let mut log = v_flex().id("log").flex_1().min_h_0().overflow_y_scroll().track_scroll(&self.scroll).px(px(14.)).py(px(10.)).bg(p.bg).font_family(mono.clone()).text_size(px(12.5)).line_height(px(19.));
+        let mut log = v_flex().id("log").flex_1().min_h_0().overflow_y_scroll().track_scroll(&self.scroll).px(px(14.)).py(px(10.)).bg(p.bg).text_size(px(12.5)).line_height(px(19.));
         if self.log.is_empty() {
             log = log.child(
                 v_flex()
                     .gap(px(8.))
-                    .font_family(cx.theme().font_family.clone())
                     .child(div().text_size(px(13.)).text_color(p.muted).child(if self.read_only { "Read-only connection: only read commands run." } else { "Run Redis commands. One command per line." }))
                     .child(h_flex().gap(px(4.)).flex_wrap().children(EXAMPLES.iter().enumerate().map(|(i, ex)| {
                         div()
@@ -1754,22 +1753,52 @@ impl Render for ConsoleView {
                     }))),
             );
         }
-        for e in &self.log {
+        for (i, e) in self.log.iter().enumerate() {
+            // GPUI text is not selectable: the copy button and the right-click menu copy instead.
+            // The button stays visible: GPUI does not hit-test an element with opacity 0.
+            let out = e.out.clone().unwrap_or_default();
+            let (cmd, out2, both) = (e.cmd.clone(), out.clone(), format!("db{}> {}\n{}", e.db, e.cmd, out));
+            let copy_btn = kit::icon_btn(("copy-out", i), "copy", cx).h(px(20.)).w(px(20.)).xsmall().tooltip("Copy the result").on_click(move |_, window, cx| {
+                ui::copy(out.clone(), cx);
+                ui::toast_ok(window, cx, "Copied");
+            });
             log = log.child(
                 v_flex()
-                    .relative()
+                    .id(("entry", i))
                     .pt(px(4.))
                     .pb(px(8.))
                     .mb(px(6.))
                     .border_b_1()
                     .border_dashed()
                     .border_color(p.border)
-                    .child(h_flex().gap(px(6.)).child(div().font_semibold().text_color(p.accent).child(format!("db{}>", e.db))).child(div().text_color(p.text).child(e.cmd.clone())))
+                    .child(
+                        h_flex()
+                            .gap(px(6.))
+                            .font_family(mono.clone())
+                            .child(div().font_semibold().text_color(p.accent).child(format!("db{}>", e.db)))
+                            .child(div().flex_1().min_w_0().text_color(p.text).child(e.cmd.clone()))
+                            .when(e.out.is_some(), |d| d.child(copy_btn))
+                            .children(e.ms.map(|ms| div().text_size(px(11.)).text_color(p.dim).child(format!("{ms:.1} ms")))),
+                    )
                     .child(match &e.out {
-                        None => div().text_color(p.muted).child("…"),
-                        Some(o) => div().mt(px(2.)).text_color(if e.error { p.danger } else { p.t_str }).children(o.lines().map(|l| div().child(if l.is_empty() { " ".to_string() } else { l.to_string() }))),
+                        None => div().font_family(mono.clone()).text_color(p.muted).child("…"),
+                        Some(o) => div().mt(px(2.)).font_family(mono.clone()).text_color(if e.error { p.danger } else { p.t_str }).children(o.lines().map(|l| div().child(if l.is_empty() { " ".to_string() } else { l.to_string() }))),
                     })
-                    .children(e.ms.map(|ms| div().absolute().top(px(4.)).right_0().text_size(px(11.)).text_color(p.dim).child(format!("{ms:.1} ms")))),
+                    .context_menu(move |menu, _, _| {
+                        let (c, o, b) = (cmd.clone(), out2.clone(), both.clone());
+                        menu.item(PopupMenuItem::new("Copy result").icon(kit::ico("copy")).on_click(move |_, window, cx| {
+                            ui::copy(o.clone(), cx);
+                            ui::toast_ok(window, cx, "Copied");
+                        }))
+                        .item(PopupMenuItem::new("Copy command").on_click(move |_, window, cx| {
+                            ui::copy(c.clone(), cx);
+                            ui::toast_ok(window, cx, "Copied");
+                        }))
+                        .item(PopupMenuItem::new("Copy command and result").on_click(move |_, window, cx| {
+                            ui::copy(b.clone(), cx);
+                            ui::toast_ok(window, cx, "Copied");
+                        }))
+                    }),
             );
         }
         let me2 = cx.weak_entity();

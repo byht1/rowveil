@@ -2,7 +2,7 @@
 # A separate workspace with its own Cargo.lock; it uses the root crate (the API router) as a library.
 [package]
 name = "rowveil-desktop"
-version = "0.5.1"
+version = "0.5.2"
 edition = "2021"
 publish = false
 license = "MIT"

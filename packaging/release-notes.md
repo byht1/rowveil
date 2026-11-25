@@ -1,4 +1,4 @@
-Rowveil 0.5.1 fixes **Tab in the SQL autocomplete** and brings back the **Collapse / Expand buttons for JSON**. It also has everything from 0.5.0, the **new desktop app**.
+Rowveil 0.5.2 lets you **copy results in the Redis console**. It also has the fixes of 0.5.1 and everything from 0.5.0, the **new desktop app**.
 
 ## Downloads
 
@@ -12,7 +12,12 @@ Rowveil 0.5.1 fixes **Tab in the SQL autocomplete** and brings back the **Collap
 | Server | `rowveil-server-*` | The web UI for a browser or a server (Windows, macOS, Linux). |
 | | `SHA256SUMS.txt` | Checksums. |
 
-## What's new in 0.5.1
+## What's new in 0.5.2
+
+- **Redis console: copy a result.** In 0.5.x, the text of a result could not be selected. Each command now has a copy button next to its duration. Right-click a command for **Copy result**, **Copy command** or **Copy command and result**.
+- **Updated UI library** (gpui-kit 0.11). No visible changes are expected.
+
+## Fixed in 0.5.1
 
 - **SQL autocomplete: Tab accepts the suggestion again.** In 0.5.0, Tab inserted an indent and closed the list. Now Tab inserts the selected suggestion, as Enter does. Without the list, Tab indents as before.
 - **JSON: Collapse and Expand are back.** 0.5.0 did not have them. In the cell dialog and for a Redis JSON value, Collapse folds every block inside the top-level value, so the top-level keys stay visible. Expand opens all blocks.
@@ -24,7 +29,7 @@ The desktop app is drawn on the GPU with [GPUI](https://www.gpui.rs/) instead of
 - **A native desktop app.** One process instead of a web view with its helper processes. On Windows: the window is ready in about 0.3 s (0.4.7: about 0.5 s), and the app uses about 100 MB of memory (0.4.7: about 430 MB).
 - **The same features**: tables with filters, sorting, editing and export; the SQL console; the Schema tab; Redis; BigQuery; saved queries; the 8 themes.
 - **No WebView2 / WebKitGTK.** On Linux the app needs Vulkan instead (see the table above).
-- **Updates.** Rowveil 0.4.x and 0.5.0 offer this version through the **Update** button in the sidebar footer.
+- **Updates.** Rowveil 0.4.x and 0.5.x offer this version through the **Update** button in the sidebar footer.
 
 ## Before you update from 0.4.x
 

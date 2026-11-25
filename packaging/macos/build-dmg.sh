@@ -58,5 +58,8 @@ stage="$work/dmg"
 mkdir -p "$stage"
 cp -R "$app" "$stage/"
 ln -s /Applications "$stage/Applications"
-hdiutil create -volname "Rowveil $version" -srcfolder "$stage" -ov -format UDZO "$dist/Rowveil-macOS-universal.dmg"
+# hdiutil's own size estimate for -srcfolder can be too small for a large binary
+# ("No space left on device" inside the image): give twice the content plus 50 MB.
+size_mb=$(( $(du -sm "$stage" | cut -f1) * 2 + 50 ))
+hdiutil create -volname "Rowveil $version" -srcfolder "$stage" -size "${size_mb}m" -ov -format UDZO "$dist/Rowveil-macOS-universal.dmg"
 ls -la "$dist"
